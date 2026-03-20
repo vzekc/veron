@@ -41,6 +41,9 @@
 (defmethod lspf:default-command-label ((app (eql *veron-app*)))
   "Befehl   ==>")
 
+(defmethod lspf:menu-command-label ((app (eql *veron-app*)))
+  "Auswahl ==>")
+
 ;;; Utility
 
 (defun format-duration (seconds)
@@ -81,11 +84,9 @@
 
 ;;; Main screen
 
-(lspf:define-screen-update main (welcome-message cmdlabel)
+(lspf:define-screen-update main (welcome-message)
   (setf welcome-message
-        (format nil "Willkommen, ~A!" (user-username (session-user lspf:*session*))))
-  (setf cmdlabel "Auswahl ==>")
-  (lspf:set-cursor 21 14))
+        (format nil "Willkommen, ~A!" (user-username (session-user lspf:*session*)))))
 
 (lspf:define-key-handler main :pf3 ()
   (record-logout (session-login-id lspf:*session*))

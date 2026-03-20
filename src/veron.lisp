@@ -84,7 +84,8 @@
 (lspf:define-screen-update main (welcome-message cmdlabel)
   (setf welcome-message
         (format nil "Willkommen, ~A!" (user-username (session-user lspf:*session*))))
-  (setf cmdlabel "Auswahl ==>"))
+  (setf cmdlabel "Auswahl ==>")
+  (lspf:set-cursor 21 14))
 
 (lspf:define-key-handler main :pf3 ()
   (record-logout (session-login-id lspf:*session*))

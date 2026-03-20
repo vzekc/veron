@@ -1,0 +1,26 @@
+(:name "login"
+ :screen "
+
+   VVVV      VVVV EEEEEEEEEEEEEE RRRRRRRRRRRR     OOOOOOOOOO   NNNN      NNNN
+   VVVV      VVVV EEEEEEEEEEEEEE RRRRRRRRRRRR     OOOOOOOOOO   NNNN      NNNN
+   VVVV      VVVV EEEE           RRRR      RRRR OOOO      OOOO NNNNNN    NNNN
+   VVVV      VVVV EEEE           RRRR      RRRR OOOO      OOOO NNNNNN    NNNN
+   VVVV      VVVV EEEE           RRRR      RRRR OOOO      OOOO NNNNNNNN  NNNN
+   VVVV      VVVV EEEE           RRRR      RRRR OOOO      OOOO NNNNNNNN  NNNN
+   VVVVVV  VVVVVV EEEEEEEEEEEE   RRRR    RRRRRR OOOO      OOOO NNNN  NNNNNNNN
+   VVVVVV  VVVVVV EEEEEEEEEEEE   RRRR    RRRRRR OOOO      OOOO NNNN  NNNNNNNN
+     VVVVVVVVVV   EEEE           RRRRRRRRRR     OOOO      OOOO NNNN    NNNNNN
+     VVVVVVVVVV   EEEE           RRRRRRRRRR     OOOO      OOOO NNNN    NNNNNN
+       VVVVVV     EEEE           RRRR  RRRRRR   OOOO      OOOO NNNN      NNNN
+       VVVVVV     EEEE           RRRR  RRRRRR   OOOO      OOOO NNNN      NNNN
+         VV       EEEEEEEEEEEEEE RRRR    RRRRRR   OOOOOOOOOO   NNNN      NNNN
+         VV       EEEEEEEEEEEEEE RRRR    RRRRRR   OOOOOOOOOO   NNNN      NNNN
+
+                   V.z.E.k.C. Electronic Retro Online Network
+
+   Username:
+   Password:
+"
+ :fields ((:from (18 12) :len 21 :name username :write t)
+          (:from (19 12) :len 21 :name password :write t :hidden t :transient t))
+ :keys ((:enter "Login")))

@@ -1,0 +1,7 @@
+(:name "main"
+ :screen "
+
+
+"
+ :fields ((:from (1 0) :len 79 :name welcome-message :color green :intense t))
+ :keys ((:pf3 "Logoff")))

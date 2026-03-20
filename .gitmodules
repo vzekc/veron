@@ -1,0 +1,9 @@
+[submodule "woltlab-login"]
+	path = woltlab-login
+	url = https://github.com/vzekc/woltlab-login
+[submodule "lispf"]
+	path = lispf
+	url = https://github.com/hanshuebner/lispf
+[submodule "CL3270"]
+	path = CL3270
+	url = https://github.com/marcoxa/CL3270

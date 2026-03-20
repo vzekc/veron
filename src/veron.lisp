@@ -63,7 +63,7 @@
 
 (lspf:define-key-handler login :enter (username password)
   (when (or (string= username "") (string= password ""))
-    (lspf:application-error "Please enter username and password"))
+    (lspf:application-error "Bitte Benutzername und Passwort eingeben"))
   (let ((result (wl:authenticate-user username password
                                       :host (env "VERON_AUTH_DB_HOST")
                                       :port (parse-integer (env "VERON_AUTH_DB_PORT"))
@@ -71,7 +71,7 @@
                                       :user (env "VERON_AUTH_DB_USER")
                                       :db-password (env "VERON_AUTH_DB_PASSWORD"))))
     (unless result
-      (lspf:application-error "Invalid username or password"))
+      (lspf:application-error "Ungueltiger Benutzername oder Passwort"))
     (let ((user (make-user result)))
       (setf (session-user lspf:*session*) user)
       (ensure-db-user user)
@@ -83,10 +83,6 @@
   :logoff)
 
 ;;; Main screen
-
-(lspf:define-screen-update main (welcome-message)
-  (setf welcome-message
-        (format nil "Willkommen, ~A!" (user-username (session-user lspf:*session*)))))
 
 (lspf:define-key-handler main :pf3 ()
   (record-logout (session-login-id lspf:*session*))

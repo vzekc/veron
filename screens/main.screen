@@ -4,4 +4,6 @@
 
 "
  :fields ((:from (1 0) :len 79 :name welcome-message :color green :intense t))
- :keys ((:pf3 "Logoff")))
+ :keys ((:pf3 "Logoff")
+        (:pf6 "About")
+        (:pf9 "Who" :goto who)))

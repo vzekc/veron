@@ -2,6 +2,7 @@
 
 (defpackage #:veron
   (:use #:cl)
-  (:local-nicknames (#:lspf #:lispf)
+  (:local-nicknames (#:bt #:bordeaux-threads)
+                    (#:lspf #:lispf)
                     (#:wl #:woltlab-login))
   (:export #:start))

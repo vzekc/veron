@@ -1,0 +1,13 @@
+(:name "who"
+ :screen "
+
+      User             Screen          Connected
+"
+ :fields ((:from (2 1) :len 3 :name num :color turquoise :repeat 17)
+          (:from (2 6) :len 16 :name user :color green :intense t :repeat 17)
+          (:from (2 23) :len 15 :name screen :color turquoise :repeat 17)
+          (:from (2 39) :len 20 :name connected :repeat 17)
+          (:from (20 1) :len 30 :name page-info :color turquoise))
+ :keys ((:pf3 "Zurueck" :back t)
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

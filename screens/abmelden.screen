@@ -1,0 +1,11 @@
+(:name "abmelden"
+ :no-command t
+ :aliases ("logout" "logoff")
+ :screen "
+
+
+   Wirklich abmelden?
+"
+ :fields ()
+ :keys ((:pf5 "Ja, abmelden")
+        (:pf3 "Nein, zurueck" :back t)))

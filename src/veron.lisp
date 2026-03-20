@@ -85,6 +85,11 @@
 ;;; Main screen
 
 (lspf:define-key-handler main :pf3 ()
+  'abmelden)
+
+;;; Logout confirmation
+
+(lspf:define-key-handler abmelden :pf5 ()
   (record-logout (session-login-id lspf:*session*))
   :logoff)
 

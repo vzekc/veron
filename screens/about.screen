@@ -1,6 +1,7 @@
 (:name "about"
  :anonymous t
  :command t
+ :navigable t
  :aliases ("info")
  :screen "
 

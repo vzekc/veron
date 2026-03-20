@@ -1,5 +1,6 @@
 (:name "protokoll"
  :command t
+ :navigable t
  :aliases ("log")
  :screen "
 

@@ -1,6 +1,7 @@
 (:name "gaestebuch"
  :anonymous t
  :command t
+ :navigable t
  :aliases ("gb")
  :screen "
 

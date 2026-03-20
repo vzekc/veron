@@ -1,5 +1,6 @@
 (:name "who"
  :command t
+ :navigable t
  :aliases ("wer")
  :screen "
 

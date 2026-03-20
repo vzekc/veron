@@ -1,4 +1,5 @@
 (:name "abmelden"
+ :navigable t
  :aliases ("logout" "logoff")
  :screen "
 

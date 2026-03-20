@@ -21,6 +21,11 @@
                      (asdf:system-source-directory :veron))
   :session-class 'veron-session)
 
+;;; Application customization
+
+(defmethod lspf:unknown-key-message ((app (eql *veron-app*)) key-name)
+  (format nil "~A: Unbekannte Taste" key-name))
+
 ;;; Utility
 
 (defun format-duration (seconds)

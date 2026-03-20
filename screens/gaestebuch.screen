@@ -1,4 +1,5 @@
 (:name "gaestebuch"
+ :aliases ("gb")
  :screen "
 
      Autor           Datum            Nachricht

@@ -1,12 +1,12 @@
 (:name "main"
+ :menu "main"
  :screen "
 
 
-   1  Gaestebuch          Eintraege lesen und schreiben
-   2  Wer ist da?         Angemeldete Benutzer anzeigen
-   3  Protokoll           Anmeldeprotokoll
-   4  Ueber VERON         Informationen zum V.z.E.k.C.
 "
- :fields ((:from (0 0) :len 79 :name welcome-message :color green :intense t))
+ :fields ((:from (0 0) :len 79 :name welcome-message :color green :intense t)
+          (:from (3 3) :len 3 :name key :color green :intense t :repeat 8)
+          (:from (3 8) :len 20 :name label :intense t :repeat 8)
+          (:from (3 29) :len 50 :name description :repeat 8))
  :keys ((:enter "Auswahl")
         (:pf3 "Abmelden")))

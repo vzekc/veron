@@ -1,4 +1,5 @@
 (:name "protokoll"
+ :aliases ("log")
  :screen "
 
      Benutzer         Anmeldung        Abmeldung        Terminal

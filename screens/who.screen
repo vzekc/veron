@@ -1,4 +1,5 @@
 (:name "who"
+ :aliases ("wer")
  :screen "
 
       User             Screen          Connected

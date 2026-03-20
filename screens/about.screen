@@ -1,4 +1,5 @@
 (:name "about"
+ :aliases ("info")
  :screen "
 
    Verein zum Erhalt klassischer Computer e.V.

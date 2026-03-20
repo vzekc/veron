@@ -41,31 +41,6 @@
 (defmethod lspf:default-command-label ((app (eql *veron-app*)))
   "Befehl   ==>")
 
-;;; Menu system
-
-(defparameter *screen-aliases*
-  '(("gb" . gaestebuch)
-    ("gaestebuch" . gaestebuch)
-    ("wer" . who)
-    ("who" . who)
-    ("log" . protokoll)
-    ("protokoll" . protokoll)
-    ("info" . about)
-    ("about" . about))
-  "Screen name aliases for direct navigation.")
-
-(defmethod lspf:process-command ((app (eql *veron-app*)) (command string))
-  (let* ((trimmed (string-trim '(#\Space) command))
-         (jump-p (and (plusp (length trimmed))
-                      (char= (char trimmed 0) #\=)))
-         (key (if jump-p (subseq trimmed 1) trimmed))
-         (target (or (lspf:find-menu-entry app key)
-                     (cdr (assoc key *screen-aliases* :test #'string-equal)))))
-    (when target
-      (if jump-p
-          (cons :jump target)
-          target))))
-
 ;;; Utility
 
 (defun format-duration (seconds)
@@ -110,9 +85,6 @@
   (setf welcome-message
         (format nil "Willkommen, ~A!" (user-username (session-user lspf:*session*))))
   (setf cmdlabel "Auswahl ==>"))
-
-(lspf:define-key-handler main :enter ()
-  :stay)
 
 (lspf:define-key-handler main :pf3 ()
   (record-logout (session-login-id lspf:*session*))
@@ -169,9 +141,10 @@
              (entry (first entries)))
         (when entry
           (setf (lspf:session-property lspf:*session* :browse-entry) entry)
+          (setf (lspf:session-property lspf:*session* :browse-index) index)
           'gaestebuch-eintrag)))))
 
-(lspf:define-screen-update gaestebuch-eintrag (author date message entry-counter)
+(lspf:define-screen-update gaestebuch-eintrag (author date message)
   (let ((entry (lspf:session-property lspf:*session* :browse-entry)))
     (when entry
       (setf author (getf entry :author)
@@ -180,7 +153,30 @@
             message (getf entry :message))))
   (let ((user (session-user lspf:*session*)))
     (when (admin-p user)
-      (lspf:show-key :pf5 "Loeschen"))))
+      (lspf:show-key :pf5 "Loeschen")))
+  (let ((index (lspf:session-property lspf:*session* :browse-index))
+        (total (guestbook-count)))
+    (when (and index (> index 0))
+      (lspf:show-key :pf7 "Vor."))
+    (when (and index (< index (1- total)))
+      (lspf:show-key :pf8 "Naech."))))
+
+(defun browse-guestbook-entry (direction)
+  "Navigate to prev (-1) or next (+1) guestbook entry. Returns :stay."
+  (let* ((index (lspf:session-property lspf:*session* :browse-index))
+         (new-index (when index (+ index direction)))
+         (entries (when new-index (guestbook-entries new-index 1)))
+         (entry (first entries)))
+    (when entry
+      (setf (lspf:session-property lspf:*session* :browse-entry) entry)
+      (setf (lspf:session-property lspf:*session* :browse-index) new-index)))
+  :stay)
+
+(lspf:define-key-handler gaestebuch-eintrag :pf7 ()
+  (browse-guestbook-entry -1))
+
+(lspf:define-key-handler gaestebuch-eintrag :pf8 ()
+  (browse-guestbook-entry 1))
 
 (lspf:define-key-handler gaestebuch-eintrag :pf5 ()
   (let ((user (session-user lspf:*session*)))

@@ -23,4 +23,5 @@
 "
  :fields ((:from (18 12) :len 21 :name username :write t)
           (:from (19 12) :len 21 :name password :write t :hidden t :transient t))
- :keys ((:enter "Login")))
+ :keys ((:enter "Login")
+        (:pf3 "Disconnect")))

@@ -36,7 +36,10 @@
   (format nil "~A: Unbekannte Taste" key-name))
 
 (defmethod lspf:unknown-command-message ((app (eql *veron-app*)) command)
-  (format nil "~A: Unbekanntes Kommando" command))
+  (format nil "~A: Unbekannter Befehl" command))
+
+(defmethod lspf:default-command-label ((app (eql *veron-app*)))
+  "Befehl   ==>")
 
 ;;; Menu system
 
@@ -106,7 +109,7 @@
 (lspf:define-screen-update main (welcome-message cmdlabel)
   (setf welcome-message
         (format nil "Willkommen, ~A!" (user-username (session-user lspf:*session*))))
-  (setf cmdlabel "Option  ==>"))
+  (setf cmdlabel "Auswahl ==>"))
 
 (lspf:define-key-handler main :enter ()
   :stay)

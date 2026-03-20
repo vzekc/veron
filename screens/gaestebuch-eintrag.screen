@@ -1,4 +1,5 @@
 (:name "gaestebuch-eintrag"
+ :anonymous t
  :screen "
 
 Autor..:

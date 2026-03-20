@@ -1,4 +1,5 @@
 (:name "gaestebuch"
+ :anonymous t
  :command t
  :aliases ("gb")
  :screen "

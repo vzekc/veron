@@ -1,4 +1,5 @@
 (:name "gaestebuch-pruefen"
+ :anonymous t
  :screen "
 
 Autor..:

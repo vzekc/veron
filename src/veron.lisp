@@ -50,6 +50,12 @@
 (defmethod lspf:menu-key-labels ((app (eql *veron-app*)))
   (values "Auswahl" "Abmelden"))
 
+(defmethod lspf:session-authenticated-p ((app (eql *veron-app*)) session)
+  (not (null (session-user session))))
+
+(defmethod lspf:anonymous-access-denied-message ((app (eql *veron-app*)))
+  "Anmeldung erforderlich")
+
 ;;; Utility
 
 (defun format-duration (seconds)

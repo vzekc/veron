@@ -1,4 +1,5 @@
 (:name "login"
+ :anonymous t
  :screen "
 
    VVVV      VVVV EEEEEEEEEEEEEE RRRRRRRRRRRR     OOOOOOOOOO   NNNN      NNNN

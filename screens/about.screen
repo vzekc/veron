@@ -1,4 +1,5 @@
 (:name "about"
+ :anonymous t
  :command t
  :aliases ("info")
  :screen "

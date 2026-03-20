@@ -1,5 +1,4 @@
 (:name "login"
- :no-command t
  :screen "
 
    VVVV      VVVV EEEEEEEEEEEEEE RRRRRRRRRRRR     OOOOOOOOOO   NNNN      NNNN

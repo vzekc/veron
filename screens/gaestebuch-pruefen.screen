@@ -1,0 +1,14 @@
+(:name "gaestebuch-pruefen"
+ :screen "
+
+Autor..:
+Nachricht:
+
+
+   Eintrag speichern?
+"
+ :fields ((:from (1 10) :len 30 :name author :intense t :color green)
+          (:from (3 0) :len 79 :name message :repeat 12)
+          (:from (16 0) :len 79 :name confirm-prompt :color turquoise))
+ :keys ((:pf5 "Speichern")
+        (:pf3 "Zurueck" :back t)))

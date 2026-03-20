@@ -1,4 +1,5 @@
 (:name "protokoll"
+ :command t
  :aliases ("log")
  :screen "
 

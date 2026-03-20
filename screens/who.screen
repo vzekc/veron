@@ -1,4 +1,5 @@
 (:name "who"
+ :command t
  :aliases ("wer")
  :screen "
 

@@ -44,6 +44,12 @@
 (defmethod lspf:menu-command-label ((app (eql *veron-app*)))
   "Auswahl ==>")
 
+(defmethod lspf:paging-labels ((app (eql *veron-app*)))
+  (values "Vor." "Naech."))
+
+(defmethod lspf:menu-key-labels ((app (eql *veron-app*)))
+  (values "Auswahl" "Abmelden"))
+
 ;;; Utility
 
 (defun format-duration (seconds)
@@ -196,19 +202,40 @@
 (lspf:define-key-handler gaestebuch-loeschen :pf5 ()
   (let ((entry-id (lspf:session-property lspf:*session* :confirm-delete)))
     (when entry-id
-      (delete-guestbook-entry entry-id)
-      (setf (lspf:session-property lspf:*session* :confirm-delete) nil)
-      (setf (lspf:session-property lspf:*session* :browse-entry) nil)))
-  :back)
+      (let ((index (lspf:session-property lspf:*session* :browse-index)))
+        (delete-guestbook-entry entry-id)
+        (setf (lspf:session-property lspf:*session* :confirm-delete) nil)
+        ;; Try to show the next entry (which now occupies the same index)
+        (let* ((entries (guestbook-entries index 1))
+               (entry (first entries)))
+          (cond
+            (entry
+             ;; Next entry exists at same index
+             (setf (lspf:session-property lspf:*session* :browse-entry) entry)
+             (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+                   "Eintrag geloescht")
+             :back)  ; back to gaestebuch-eintrag
+            (t
+             ;; No more entries, return to list
+             (setf (lspf:session-property lspf:*session* :browse-entry) nil)
+             (pop (lspf:session-screen-stack lspf:*session*))
+             (setf (lspf:list-offset lspf:*session* 'gaestebuch) 0)
+             (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+                   "Eintrag geloescht")
+             :back)))))))
 
 ;;; Guestbook new entry
 
-(lspf:define-screen-update gaestebuch-neu (author)
+(lspf:define-screen-update gaestebuch-neu (author message)
   (let ((user (session-user lspf:*session*)))
     (when (and user (string= author ""))
       (setf author (user-username user)))
     (when user
-      (lspf:set-field-attribute "author" :write nil :intense t))))
+      (lspf:set-field-attribute "author" :write nil :intense t)))
+  ;; Restore message from session property when returning from confirmation
+  (let ((saved-message (lspf:session-property lspf:*session* :new-entry-message)))
+    (when (and saved-message (string= message ""))
+      (setf message saved-message))))
 
 (lspf:define-key-handler gaestebuch-neu :pf5 (author message)
   (let ((user (session-user lspf:*session*)))
@@ -219,8 +246,31 @@
                     (if (string= author "")
                         (lspf:application-error "Bitte Name eingeben")
                         (format nil "~A (Gast)" author)))))
-      (add-guestbook-entry name message))
-    :back))
+      (setf (lspf:session-property lspf:*session* :new-entry-author) name)
+      (setf (lspf:session-property lspf:*session* :new-entry-message) message))
+    'gaestebuch-pruefen))
+
+;;; Guestbook save confirmation
+
+(lspf:define-screen-update gaestebuch-pruefen (author message)
+  (setf author (lspf:session-property lspf:*session* :new-entry-author))
+  (setf message (lspf:session-property lspf:*session* :new-entry-message)))
+
+(lspf:define-key-handler gaestebuch-pruefen :pf5 ()
+  (let ((author (lspf:session-property lspf:*session* :new-entry-author))
+        (message (lspf:session-property lspf:*session* :new-entry-message)))
+    (when (and author message)
+      (add-guestbook-entry author message)
+      (setf (lspf:session-property lspf:*session* :new-entry-author) nil)
+      (setf (lspf:session-property lspf:*session* :new-entry-message) nil)
+      ;; Reset list offset so the new entry is visible at the top
+      (setf (lspf:list-offset lspf:*session* 'gaestebuch) 0)
+      ;; Set confirmation message for the guestbook list
+      (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+            "Eintrag gespeichert")))
+  ;; Pop back past gaestebuch-neu to the guestbook list
+  (pop (lspf:session-screen-stack lspf:*session*))
+  :back)
 
 ;;; Login log screen
 

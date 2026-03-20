@@ -1,0 +1,16 @@
+(:name "gaestebuch"
+ :screen "
+
+     Autor           Datum            Nachricht
+"
+ :fields ((:from (2 1) :len 1 :name sel :write t :highlighting underscore
+           :repeat 17)
+          (:from (2 5) :len 15 :name author :intense t :color green :repeat 17)
+          (:from (2 21) :len 16 :name date :color turquoise :repeat 17)
+          (:from (2 38) :len 41 :name preview :repeat 17)
+          (:from (19 1) :len 30 :name page-info :color turquoise))
+ :keys ((:pf5 "Neu" :goto gaestebuch-neu)
+        (:enter "Anzeigen")
+        (:pf3 "Zurueck" :back t)
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

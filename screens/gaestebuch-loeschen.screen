@@ -1,0 +1,9 @@
+(:name "gaestebuch-loeschen"
+ :screen "
+
+
+   Eintrag wirklich loeschen?
+"
+ :fields ()
+ :keys ((:pf5 "Ja, loeschen")
+        (:pf3 "Nein" :back t)))

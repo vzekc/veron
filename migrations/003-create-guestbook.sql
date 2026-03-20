@@ -1,0 +1,6 @@
+CREATE TABLE guestbook (
+    id SERIAL PRIMARY KEY,
+    author VARCHAR(100) NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

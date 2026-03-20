@@ -1,0 +1,12 @@
+(:name "gaestebuch-neu"
+ :screen "
+
+Dein Name:
+
+Nachricht:
+"
+ :fields ((:from (1 12) :len 30 :name author :write t :highlighting underscore)
+          (:from (4 0) :len 79 :name message :write t :highlighting underscore
+           :repeat 15))
+ :keys ((:pf5 "Speichern")
+        (:pf3 "Abbrechen" :back t)))

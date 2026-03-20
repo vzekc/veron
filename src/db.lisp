@@ -1,0 +1,156 @@
+;;; -*- Mode: Lisp -*-
+
+(in-package #:veron)
+
+;;; Database connection
+
+(defvar *db-params* nil
+  "Postmodern connection parameters list.")
+
+(defun db-params ()
+  (or *db-params*
+      (setf *db-params*
+            (list (env "VERON_DB_NAME")
+                  (env "VERON_DB_USER")
+                  (env "VERON_DB_PASSWORD")
+                  (env "VERON_DB_HOST")
+                  :port (parse-integer (env "VERON_DB_PORT"))
+                  :pooled-p t))))
+
+(defmacro with-db (&body body)
+  `(pomo:with-connection (db-params)
+     ,@body))
+
+;;; Migration runner
+
+(defun migrations-directory ()
+  (merge-pathnames #P"migrations/" (asdf:system-source-directory :veron)))
+
+(defun ensure-migrations-table ()
+  (unless (pomo:table-exists-p "schema_migrations")
+    (pomo:execute
+     "CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )")))
+
+(defun applied-versions ()
+  (mapcar #'first
+          (pomo:query "SELECT version FROM schema_migrations ORDER BY version")))
+
+(defun migration-files ()
+  (sort (directory (merge-pathnames "*.sql" (migrations-directory)))
+        #'string< :key #'namestring))
+
+(defun migration-version (path)
+  (parse-integer (subseq (pathname-name path) 0 (position #\- (pathname-name path)))))
+
+(defun split-sql (sql)
+  "Split SQL string on semicolons into individual non-empty statements."
+  (loop for stmt in (uiop:split-string sql :separator ";")
+        for trimmed = (string-trim '(#\Space #\Tab #\Newline #\Return) stmt)
+        when (plusp (length trimmed))
+          collect trimmed))
+
+(defun run-migrations ()
+  (ensure-migrations-table)
+  (let ((applied (applied-versions)))
+    (dolist (file (migration-files))
+      (let ((version (migration-version file)))
+        (unless (member version applied)
+          (format t "Applying migration ~A~%" (pathname-name file))
+          (pomo:with-transaction ()
+            (dolist (stmt (split-sql (uiop:read-file-string file)))
+              (pomo:execute stmt))
+            (pomo:execute (format nil "INSERT INTO schema_migrations (version) VALUES (~D)"
+                                  version))))))))
+
+(defun initialize-db ()
+  (with-db (run-migrations)))
+
+;;; User persistence
+
+(defun ensure-db-user (user)
+  (with-db
+    (pomo:execute
+     "INSERT INTO users (id, name, last_login) VALUES ($1, $2, CURRENT_TIMESTAMP)
+      ON CONFLICT (id) DO UPDATE SET name = $2, last_login = CURRENT_TIMESTAMP"
+     (user-id user) (user-username user))))
+
+(defun record-login (user &key terminal-type)
+  (with-db
+    (pomo:query
+     "INSERT INTO logins (user_id, terminal_type) VALUES ($1, $2) RETURNING id"
+     (user-id user) terminal-type :single)))
+
+(defun record-logout (login-id)
+  (when login-id
+    (with-db
+      (pomo:execute
+       "UPDATE logins SET logout_at = CURRENT_TIMESTAMP WHERE id = $1"
+       login-id))))
+
+(defun db-null-p (value)
+  "Return T if VALUE is a Postmodern NULL marker."
+  (eq value :null))
+
+(defun format-date (universal-time)
+  "Format a universal time as DD.MM.YYYY. Returns empty string for NULL."
+  (if (or (null universal-time) (db-null-p universal-time))
+      ""
+      (multiple-value-bind (sec min hour day month year)
+          (decode-universal-time universal-time)
+        (declare (ignore sec min hour))
+        (format nil "~2,'0D.~2,'0D.~4D" day month year))))
+
+(defun format-datetime (universal-time)
+  "Format a universal time as DD.MM.YYYY HH:MM. Returns empty string for NULL."
+  (if (or (null universal-time) (db-null-p universal-time))
+      ""
+      (multiple-value-bind (sec min hour day month year)
+          (decode-universal-time universal-time)
+        (declare (ignore sec))
+        (format nil "~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D" day month year hour min))))
+
+;;; Guestbook persistence
+
+(defun add-guestbook-entry (author message)
+  (with-db
+    (pomo:execute
+     "INSERT INTO guestbook (author, message) VALUES ($1, $2)"
+     author message)))
+
+(defun guestbook-entries (start count)
+  (with-db
+    (pomo:query
+     "SELECT id, author, message, created_at FROM guestbook
+      ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+     count start :plists)))
+
+(defun guestbook-entry (id)
+  (with-db
+    (first (pomo:query
+            "SELECT id, author, message, created_at FROM guestbook WHERE id = $1"
+            id :plists))))
+
+(defun guestbook-count ()
+  (with-db
+    (pomo:query "SELECT COUNT(*) FROM guestbook" :single)))
+
+(defun delete-guestbook-entry (id)
+  (with-db
+    (pomo:execute "DELETE FROM guestbook WHERE id = $1" id)))
+
+;;; Login log
+
+(defun login-log-entries (start count)
+  (with-db
+    (pomo:query
+     "SELECT u.name, l.login_at, l.logout_at, l.terminal_type
+      FROM logins l JOIN users u ON l.user_id = u.id
+      ORDER BY l.login_at DESC LIMIT $1 OFFSET $2"
+     count start :plists)))
+
+(defun login-log-count ()
+  (with-db
+    (pomo:query "SELECT COUNT(*) FROM logins" :single)))

@@ -7,6 +7,7 @@
   :components ((:module "src"
                 :components ((:file "package")
                              (:file "dotenv")
+                             (:file "db")
                              (:file "user")
                              (:file "veron"))))
-  :depends-on (#:lispf #:woltlab-login))
+  :depends-on (#:lispf #:woltlab-login #:postmodern))

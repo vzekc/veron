@@ -13,6 +13,16 @@
   (print-unreadable-object (user stream :type t)
     (format stream "~A (ID ~D)" (user-username user) (user-id user))))
 
+(defvar *admin-groups* '("Administratoren")
+  "List of WoltLab group names that grant admin privileges.")
+
+(defun admin-p (user)
+  "Return T if USER belongs to any admin group."
+  (and user
+       (some (lambda (group)
+               (member (getf group :group-name) *admin-groups* :test #'string=))
+             (user-groups user))))
+
 (defun make-user (auth-result)
   "Create a user from an authenticate-user result plist."
   (make-instance 'user

@@ -1,0 +1,13 @@
+(:name "protokoll"
+ :screen "
+
+     Benutzer         Anmeldung        Abmeldung        Terminal
+"
+ :fields ((:from (2 5) :len 16 :name name :color green :intense t :repeat 17)
+          (:from (2 22) :len 16 :name login-at :color turquoise :repeat 17)
+          (:from (2 39) :len 16 :name logout-at :color turquoise :repeat 17)
+          (:from (2 56) :len 23 :name terminal-type :repeat 17)
+          (:from (19 1) :len 30 :name page-info :color turquoise))
+ :keys ((:pf3 "Zurueck" :back t)
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

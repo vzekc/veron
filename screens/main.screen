@@ -2,8 +2,11 @@
  :screen "
 
 
+   1  Gaestebuch          Eintraege lesen und schreiben
+   2  Wer ist da?         Angemeldete Benutzer anzeigen
+   3  Protokoll           Anmeldeprotokoll
+   4  Ueber VERON         Informationen zum V.z.E.k.C.
 "
- :fields ((:from (1 0) :len 79 :name welcome-message :color green :intense t))
- :keys ((:pf3 "Abmelden")
-        (:pf6 "Ueber")
-        (:pf9 "Wer ist da?" :goto who)))
+ :fields ((:from (0 0) :len 79 :name welcome-message :color green :intense t))
+ :keys ((:enter "Auswahl")
+        (:pf3 "Abmelden")))

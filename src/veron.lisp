@@ -5,12 +5,21 @@
 
 (in-package #:veron)
 
+;;; Admin group configuration
+
+(let ((groups-env (uiop:getenv "VERON_ADMIN_GROUPS")))
+  (when groups-env
+    (setf *admin-groups*
+          (mapcar (lambda (s) (string-trim '(#\Space) s))
+                  (uiop:split-string groups-env :separator ",")))))
+
 ;;; Session class
 
 (defclass veron-session (lspf:session)
   ((user :initform nil :accessor session-user)
    (term-type :initform "" :accessor session-term-type)
-   (connect-time :initform (get-universal-time) :reader session-connect-time)))
+   (connect-time :initform (get-universal-time) :reader session-connect-time)
+   (login-id :initform nil :accessor session-login-id)))
 
 ;;; Application definition
 
@@ -25,6 +34,34 @@
 
 (defmethod lspf:unknown-key-message ((app (eql *veron-app*)) key-name)
   (format nil "~A: Unbekannte Taste" key-name))
+
+(defmethod lspf:unknown-command-message ((app (eql *veron-app*)) command)
+  (format nil "~A: Unbekanntes Kommando" command))
+
+;;; Menu system
+
+(defparameter *screen-aliases*
+  '(("gb" . gaestebuch)
+    ("gaestebuch" . gaestebuch)
+    ("wer" . who)
+    ("who" . who)
+    ("log" . protokoll)
+    ("protokoll" . protokoll)
+    ("info" . about)
+    ("about" . about))
+  "Screen name aliases for direct navigation.")
+
+(defmethod lspf:process-command ((app (eql *veron-app*)) (command string))
+  (let* ((trimmed (string-trim '(#\Space) command))
+         (jump-p (and (plusp (length trimmed))
+                      (char= (char trimmed 0) #\=)))
+         (key (if jump-p (subseq trimmed 1) trimmed))
+         (target (or (lspf:find-menu-entry app key)
+                     (cdr (assoc key *screen-aliases* :test #'string-equal)))))
+    (when target
+      (if jump-p
+          (cons :jump target)
+          target))))
 
 ;;; Utility
 
@@ -54,7 +91,11 @@
                                       :db-password (env "VERON_AUTH_DB_PASSWORD"))))
     (unless result
       (lspf:application-error "Invalid username or password"))
-    (setf (session-user lspf:*session*) (make-user result))
+    (let ((user (make-user result)))
+      (setf (session-user lspf:*session*) user)
+      (ensure-db-user user)
+      (setf (session-login-id lspf:*session*)
+            (record-login user :terminal-type (session-term-type lspf:*session*))))
     'main))
 
 (lspf:define-key-handler login :pf3 ()
@@ -62,15 +103,17 @@
 
 ;;; Main screen
 
-(lspf:define-screen-update main (welcome-message)
+(lspf:define-screen-update main (welcome-message cmdlabel)
   (setf welcome-message
-        (format nil "Welcome, ~A!" (user-username (session-user lspf:*session*)))))
+        (format nil "Willkommen, ~A!" (user-username (session-user lspf:*session*))))
+  (setf cmdlabel "Option  ==>"))
+
+(lspf:define-key-handler main :enter ()
+  :stay)
 
 (lspf:define-key-handler main :pf3 ()
+  (record-logout (session-login-id lspf:*session*))
   :logoff)
-
-(lspf:define-key-handler main :pf6 ()
-  'about)
 
 ;;; About screen
 
@@ -103,8 +146,97 @@
                   collect (list* :num (format nil "~D." (1+ i)) rec))
             total)))
 
+;;; Guestbook screens
+
+(lspf:define-list-data-getter gaestebuch (start end)
+  (let* ((total (guestbook-count))
+         (entries (guestbook-entries start (- end start))))
+    (values (loop for e in entries
+                  collect (list :author (getf e :author)
+                                :date (let ((ts (getf e :created-at)))
+                                        (if ts (format-datetime ts) ""))
+                                :preview (substitute #\Space #\Newline
+                                                     (getf e :message))))
+            total)))
+
+(lspf:define-key-handler gaestebuch :enter ()
+  (let ((index (lspf:selected-list-index)))
+    (when index
+      (let* ((entries (guestbook-entries index 1))
+             (entry (first entries)))
+        (when entry
+          (setf (lspf:session-property lspf:*session* :browse-entry) entry)
+          'gaestebuch-eintrag)))))
+
+(lspf:define-screen-update gaestebuch-eintrag (author date message entry-counter)
+  (let ((entry (lspf:session-property lspf:*session* :browse-entry)))
+    (when entry
+      (setf author (getf entry :author)
+            date (let ((ts (getf entry :created-at)))
+                   (if ts (format-datetime ts) ""))
+            message (getf entry :message))))
+  (let ((user (session-user lspf:*session*)))
+    (when (admin-p user)
+      (lspf:show-key :pf5 "Loeschen"))))
+
+(lspf:define-key-handler gaestebuch-eintrag :pf5 ()
+  (let ((user (session-user lspf:*session*)))
+    (unless (admin-p user)
+      (lspf:application-error "Keine Berechtigung"))
+    (let ((entry (lspf:session-property lspf:*session* :browse-entry)))
+      (when entry
+        (setf (lspf:session-property lspf:*session* :confirm-delete)
+              (getf entry :id))
+        'gaestebuch-loeschen))))
+
+;;; Guestbook delete confirmation
+
+(lspf:define-key-handler gaestebuch-loeschen :pf5 ()
+  (let ((entry-id (lspf:session-property lspf:*session* :confirm-delete)))
+    (when entry-id
+      (delete-guestbook-entry entry-id)
+      (setf (lspf:session-property lspf:*session* :confirm-delete) nil)
+      (setf (lspf:session-property lspf:*session* :browse-entry) nil)))
+  :back)
+
+;;; Guestbook new entry
+
+(lspf:define-screen-update gaestebuch-neu (author)
+  (let ((user (session-user lspf:*session*)))
+    (when (and user (string= author ""))
+      (setf author (user-username user)))
+    (when user
+      (lspf:set-field-attribute "author" :write nil :intense t))))
+
+(lspf:define-key-handler gaestebuch-neu :pf5 (author message)
+  (let ((user (session-user lspf:*session*)))
+    (when (string= message "")
+      (lspf:application-error "Bitte Nachricht eingeben"))
+    (let ((name (if user
+                    (user-username user)
+                    (if (string= author "")
+                        (lspf:application-error "Bitte Name eingeben")
+                        (format nil "~A (Gast)" author)))))
+      (add-guestbook-entry name message))
+    :back))
+
+;;; Login log screen
+
+(lspf:define-list-data-getter protokoll (start end)
+  (let* ((total (login-log-count))
+         (entries (login-log-entries start (- end start))))
+    (values (loop for e in entries
+                  collect (list :name (getf e :name)
+                                :login-at (let ((ts (getf e :login-at)))
+                                            (if ts (format-datetime ts) ""))
+                                :logout-at (let ((ts (getf e :logout-at)))
+                                             (if ts (format-datetime ts) ""))
+                                :terminal-type (or (getf e :terminal-type) "")))
+            total)))
+
 ;;; Server entry point
 
 (defun start (&key (port 3270) (host "127.0.0.1"))
   "Start the VERON application on PORT."
+  (initialize-db)
   (lspf:start-application *veron-app* :port port :host host))

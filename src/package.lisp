@@ -4,5 +4,6 @@
   (:use #:cl)
   (:local-nicknames (#:bt #:bordeaux-threads)
                     (#:lspf #:lispf)
-                    (#:wl #:woltlab-login))
+                    (#:wl #:woltlab-login)
+                    (#:pomo #:postmodern))
   (:export #:start))

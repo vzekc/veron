@@ -19,8 +19,6 @@
    VERON ist das V.z.E.k.C. Electronic Retro Online Network, eine
    3270-Terminalanwendung, die Benutzern von 3270-Terminals einen
    Online-Zugang zu unserer Community bietet.
-
-                      https://classic-computing.de
 "
  :fields ((:from (4 28) :len 11 :intense t))
  :keys ((:pf3 "Zurueck")))

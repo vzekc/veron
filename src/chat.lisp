@@ -1,8 +1,52 @@
 ;;; -*- Mode: Lisp -*-
 
 ;;; Chat system - multi-channel persistent chat with private messaging
+;;;
+;;; Messages are kept in RAM for fast access. The database is used for
+;;; persistence and recovery only. On startup, messages are loaded from
+;;; the DB into the in-memory buffer.
 
 (in-package #:veron)
+
+;;; In-memory message store
+
+(defvar *chat-messages* (make-hash-table)
+  "Channel ID -> vector of message plists, ordered oldest first.")
+
+(defvar *chat-lock* (bt:make-lock "chat")
+  "Lock protecting *chat-messages*.")
+
+(defvar *chat-id-counter* 0
+  "Monotonically increasing message ID for in-memory messages.")
+
+(defun load-chat-from-db ()
+  "Load all chat messages from the database into RAM."
+  (with-db
+    (let ((channels (pomo:query "SELECT id FROM chat_channels" :column)))
+      (dolist (channel-id channels)
+        (let ((msgs (pomo:query
+                     "SELECT id, username, message, created_at FROM chat_messages
+                      WHERE channel_id = $1 ORDER BY id ASC"
+                     channel-id :plists)))
+          (setf (gethash channel-id *chat-messages*)
+                (make-array (length msgs)
+                            :adjustable t :fill-pointer (length msgs)
+                            :initial-contents msgs))
+          (when msgs
+            (setf *chat-id-counter*
+                  (max *chat-id-counter*
+                       (getf (car (last msgs)) :id)))))))))
+
+(defun ensure-channel-buffer (channel-id)
+  "Ensure a message buffer exists for CHANNEL-ID."
+  (or (gethash channel-id *chat-messages*)
+      (setf (gethash channel-id *chat-messages*)
+            (make-array 0 :adjustable t :fill-pointer 0))))
+
+(defun channel-messages (channel-id)
+  "Return the message vector for CHANNEL-ID."
+  (bt:with-lock-held (*chat-lock*)
+    (ensure-channel-buffer channel-id)))
 
 ;;; Channel management
 
@@ -11,52 +55,45 @@
   (with-db
     (pomo:query "SELECT id FROM chat_channels WHERE name = 'allgemein'" :single)))
 
-;;; Message persistence
+;;; Message operations
 
 (defun add-chat-message (channel-id user message)
-  "Insert a chat message. Returns the new message ID."
-  (with-db
-    (pomo:query
-     "INSERT INTO chat_messages (channel_id, user_id, username, message)
-      VALUES ($1, $2, $3, $4) RETURNING id"
-     channel-id (user-id user) (user-username user) message :single)))
+  "Add a chat message to RAM and persist to DB."
+  (let* ((now (get-universal-time))
+         (db-id (with-db
+                  (pomo:query
+                   "INSERT INTO chat_messages (channel_id, user_id, username, message)
+                    VALUES ($1, $2, $3, $4) RETURNING id"
+                   channel-id (user-id user) (user-username user) message :single)))
+         (msg (list :id db-id
+                    :username (user-username user)
+                    :message message
+                    :created-at now)))
+    (bt:with-lock-held (*chat-lock*)
+      (let ((buf (ensure-channel-buffer channel-id)))
+        (vector-push-extend msg buf))
+      (setf *chat-id-counter* (max *chat-id-counter* db-id)))
+    db-id))
 
-(defun chat-messages-before (channel-id before-id count)
-  "Load COUNT messages before BEFORE-ID (exclusive). Returns plists, oldest first."
-  (with-db
-    (let ((rows (pomo:query
-                 "SELECT id, username, message, created_at FROM chat_messages
-                  WHERE channel_id = $1 AND id < $2
-                  ORDER BY id DESC LIMIT $3"
-                 channel-id before-id count :plists)))
-      (nreverse rows))))
+(defun chat-message-count (channel-id)
+  "Return the number of messages in a channel."
+  (length (channel-messages channel-id)))
 
-(defun chat-messages-latest (channel-id count)
-  "Load the latest COUNT messages. Returns plists, oldest first."
-  (with-db
-    (let ((rows (pomo:query
-                 "SELECT id, username, message, created_at FROM chat_messages
-                  WHERE channel_id = $1
-                  ORDER BY id DESC LIMIT $2"
-                 channel-id count :plists)))
-      (nreverse rows))))
+(defun chat-messages-slice (channel-id start end)
+  "Return messages from index START to END (exclusive) as a list."
+  (let ((buf (channel-messages channel-id)))
+    (when buf
+      (let ((len (length buf)))
+        (coerce (subseq buf (max 0 (min start len))
+                        (max 0 (min end len)))
+                'list)))))
 
-(defun chat-messages-after (channel-id after-id count)
-  "Load COUNT messages after AFTER-ID (exclusive). Returns plists, oldest first."
-  (with-db
-    (pomo:query
-     "SELECT id, username, message, created_at FROM chat_messages
-      WHERE channel_id = $1 AND id > $2
-      ORDER BY id ASC LIMIT $3"
-     channel-id after-id count :plists)))
-
-(defun chat-newest-id (channel-id)
-  "Return the ID of the newest message in a channel, or 0."
-  (with-db
-    (or (pomo:query
-         "SELECT MAX(id) FROM chat_messages WHERE channel_id = $1"
-         channel-id :single)
-        0)))
+(defun chat-messages-tail (channel-id count)
+  "Return the last COUNT messages as a list, oldest first."
+  (let* ((buf (channel-messages channel-id))
+         (len (length buf))
+         (start (max 0 (- len count))))
+    (coerce (subseq buf start len) 'list)))
 
 ;;; Message formatting
 

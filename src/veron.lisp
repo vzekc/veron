@@ -391,22 +391,22 @@
         (setf (lspf:session-property lspf:*session* :chat-channel-id) id)
         id)))
 
-(defun chat-scroll-position ()
-  "Return the current scroll anchor message ID, or NIL for latest."
-  (lspf:session-property lspf:*session* :chat-scroll-id))
+(defun chat-scroll-offset ()
+  "Return the scroll offset (end index into message buffer), or NIL for latest."
+  (lspf:session-property lspf:*session* :chat-scroll-offset))
 
 (defun chat-display-messages ()
-  "Return messages to display based on scroll position, plus any private messages."
+  "Return messages to display based on scroll position."
   (let* ((channel-id (chat-channel-id))
-         (scroll-id (chat-scroll-position))
-         (db-msgs (if scroll-id
-                      (chat-messages-before channel-id (1+ scroll-id)
-                                            +chat-display-lines+)
-                      (chat-messages-latest channel-id +chat-display-lines+)))
+         (offset (chat-scroll-offset))
          (private-msgs (consume-private-messages)))
-    (if (and (null scroll-id) private-msgs)
-        (append db-msgs private-msgs)
-        db-msgs)))
+    (if offset
+        (let* ((start (max 0 (- offset +chat-display-lines+))))
+          (chat-messages-slice channel-id start offset))
+        (let ((msgs (chat-messages-tail channel-id +chat-display-lines+)))
+          (if private-msgs
+              (append msgs private-msgs)
+              msgs)))))
 
 (defun current-username ()
   "Return the current session's username."
@@ -414,12 +414,6 @@
     (when user (user-username user))))
 
 (lspf:define-dynamic-area-updater chat messages ()
-  (when (lspf:session-property lspf:*session* :chat-loading)
-    (setf (lspf:session-property lspf:*session* :chat-loading) nil)
-    (return-from lispf:update-dynamic-area
-      (append (make-list (1- +chat-display-lines+) :initial-element "")
-              (list (list :content "Daten werden geladen..."
-                          :color cl3270:+turquoise+)))))
   (let ((help-p (lspf:session-property lspf:*session* :chat-show-help)))
     (if help-p
         ;; Show help text
@@ -446,18 +440,20 @@
         (concatenate 'string line1 (string #\Newline) line2)
         line1)))
 
+(defun clear-chat-input ()
+  "Clear the chat input fields for no-clear redisplay."
+  (let ((blank (make-string 80 :initial-element #\Space))
+        (context (lspf:session-context lspf:*session*)))
+    (setf (gethash "input1" context) blank
+          (gethash "input2" context) blank
+          (gethash "input1" lspf:*current-field-values*) blank
+          (gethash "input2" lspf:*current-field-values*) blank)))
+
 (lspf:define-key-handler chat :enter (input1 input2)
-  ;; Dismiss help if showing
   (when (lspf:session-property lspf:*session* :chat-show-help)
     (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
-  (let ((text (parse-chat-input (or input1 "") (or input2 "")))
-        (context (lspf:session-context lspf:*session*)))
-    ;; Clear input fields with spaces (needed for no-clear redisplay)
-    (let ((blank (make-string 80 :initial-element #\Space)))
-      (setf (gethash "input1" context) blank
-            (gethash "input2" context) blank
-            (gethash "input1" lspf:*current-field-values*) blank
-            (gethash "input2" lspf:*current-field-values*) blank))
+  (let ((text (parse-chat-input (or input1 "") (or input2 ""))))
+    (clear-chat-input)
     (when (string= (string-trim '(#\Space) text) "")
       (return-from lspf:handle-key :stay))
     ;; Handle /help command
@@ -483,7 +479,7 @@
     ;; Regular message
     (let ((user (session-user lspf:*session*)))
       (add-chat-message (chat-channel-id) user text))
-    (setf (lspf:session-property lspf:*session* :chat-scroll-id) nil))
+    (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil))
   :stay)
 
 (lspf:define-key-handler chat :pf1 ()
@@ -492,8 +488,7 @@
   :stay)
 
 (lspf:define-key-handler chat :pf6 ()
-  ;; Jump to newest messages
-  (setf (lspf:session-property lspf:*session* :chat-scroll-id) nil
+  (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil
         (lspf:session-property lspf:*session* :chat-show-help) nil)
   :stay)
 
@@ -501,32 +496,27 @@
   (when (lspf:session-property lspf:*session* :chat-show-help)
     (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
   (let* ((channel-id (chat-channel-id))
-         (scroll-id (chat-scroll-position))
-         (msgs (if scroll-id
-                   (chat-messages-before channel-id (1+ scroll-id)
-                                         +chat-display-lines+)
-                   (chat-messages-latest channel-id +chat-display-lines+))))
-    (when msgs
-      (setf (lspf:session-property lspf:*session* :chat-scroll-id)
-            (getf (first msgs) :id))))
+         (total (chat-message-count channel-id))
+         (offset (or (chat-scroll-offset) total))
+         (new-offset (max 0 (- offset +chat-display-lines+))))
+    (when (< new-offset offset)
+      (setf (lspf:session-property lspf:*session* :chat-scroll-offset)
+            new-offset)))
   :stay)
 
 (lspf:define-key-handler chat :pf8 ()
   (when (lspf:session-property lspf:*session* :chat-show-help)
     (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
-  (let ((scroll-id (chat-scroll-position)))
-    (unless scroll-id
+  (let ((offset (chat-scroll-offset)))
+    (unless offset
       (return-from lspf:handle-key :stay))
     (let* ((channel-id (chat-channel-id))
-           (newer (chat-messages-after channel-id scroll-id +chat-display-lines+)))
-      (if newer
-          (let ((newest-id (getf (car (last newer)) :id))
-                (channel-newest (chat-newest-id channel-id)))
-            (if (>= newest-id channel-newest)
-                (setf (lspf:session-property lspf:*session* :chat-scroll-id) nil)
-                (setf (lspf:session-property lspf:*session* :chat-scroll-id)
-                      newest-id)))
-          (setf (lspf:session-property lspf:*session* :chat-scroll-id) nil))))
+           (total (chat-message-count channel-id))
+           (new-offset (+ offset +chat-display-lines+)))
+      (if (>= new-offset total)
+          (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil)
+          (setf (lspf:session-property lspf:*session* :chat-scroll-offset)
+                new-offset))))
   :stay)
 
 ;;; Login log screen
@@ -548,4 +538,5 @@
 (defun start (&key (port 3270) (host "127.0.0.1"))
   "Start the VERON application on PORT."
   (initialize-db)
+  (load-chat-from-db)
   (lspf:start-application *veron-app* :port port :host host))

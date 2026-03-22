@@ -100,13 +100,38 @@
 (defconstant +chat-display-lines+ 17
   "Number of lines available for chat message display (rows 1-17).")
 
-(defun format-timestamp-divider (universal-time)
-  "Format a silence divider showing date and time."
-  (multiple-value-bind (sec min hour day month year)
-      (decode-display-time universal-time)
-    (declare (ignore sec))
-    (format nil "--- ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D ~49,,,'-A"
-            day month year hour min "")))
+(defparameter *german-numbers*
+  #("null" "eins" "zwei" "drei" "vier" "fuenf" "sechs" "sieben"
+    "acht" "neun" "zehn" "elf" "zwoelf" "dreizehn" "vierzehn"
+    "fuenfzehn" "sechzehn" "siebzehn" "achtzehn" "neunzehn" "zwanzig"))
+
+(defun number-to-german (n)
+  "Convert a non-negative integer to German words."
+  (if (<= n 20)
+      (aref *german-numbers* n)
+      (format nil "~D" n)))
+
+(defun german-unit (n singular plural &key (einer "einer"))
+  "Format N with SINGULAR or PLURAL German unit name.
+EINER specifies the word for 1 (einer for feminine, einem for dative masculine)."
+  (if (= n 1)
+      (format nil "~A ~A" einer singular)
+      (format nil "~A ~A" (number-to-german n) plural)))
+
+(defun format-silence-divider (gap-seconds)
+  "Format a silence divider showing the duration in German words."
+  (let* ((total-minutes (floor gap-seconds 60))
+         (days (floor total-minutes (* 24 60)))
+         (hours (floor (mod total-minutes (* 24 60)) 60))
+         (minutes (mod total-minutes 60))
+         (parts '()))
+    (when (plusp minutes)
+      (push (german-unit minutes "Minute" "Minuten") parts))
+    (when (plusp hours)
+      (push (german-unit hours "Stunde" "Stunden") parts))
+    (when (plusp days)
+      (push (german-unit days "Tag" "Tagen" :einer "einem") parts))
+    (format nil "-- nach ~{~A~^, ~} Schweigen:" parts)))
 
 (defun word-wrap (text width)
   "Wrap TEXT to WIDTH characters, breaking at word boundaries when possible.
@@ -172,7 +197,7 @@ Returns a list of strings or plists (for colored lines)."
         ;; Insert silence divider if gap > 15 minutes
         (when (and last-time timestamp
                    (> (- timestamp last-time) +silence-threshold+))
-          (push (list :content (format-timestamp-divider timestamp)
+          (push (list :content (format-silence-divider (- timestamp last-time))
                       :color cl3270:+turquoise+)
                 lines))
         (when timestamp (setf last-time timestamp))

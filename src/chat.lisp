@@ -121,39 +121,51 @@
   "Format a date divider line."
   (format nil "--- ~2,'0D.~2,'0D.~4D ~53,,,'-A" day month year ""))
 
+(defun word-wrap (text width)
+  "Wrap TEXT to WIDTH characters, breaking at word boundaries when possible.
+Returns a list of strings."
+  (when (zerop (length text))
+    (return-from word-wrap (list "")))
+  (let ((lines '())
+        (pos 0)
+        (len (length text)))
+    (loop while (< pos len)
+          do (let ((remaining (- len pos)))
+               (if (<= remaining width)
+                   (progn
+                     (push (subseq text pos) lines)
+                     (setf pos len))
+                   (let* ((end (+ pos width))
+                          (break-pos (position #\Space text :end end :from-end t :start pos)))
+                     (if (and break-pos (> break-pos pos))
+                         (progn
+                           (push (subseq text pos break-pos) lines)
+                           (setf pos (1+ break-pos)))
+                         (progn
+                           (push (subseq text pos end) lines)
+                           (setf pos end)))))))
+    (nreverse lines)))
+
 (defun wrap-message-lines (username message timestamp)
-  "Format a chat message into display lines (max 79 chars each).
+  "Format a chat message into display lines with word wrapping.
 Returns a list of strings."
   (let* ((time-str (format-time timestamp))
          (prefix (format nil "~A ~A: " time-str username))
          (prefix-len (length prefix))
          (cont-indent (make-string (min prefix-len 20) :initial-element #\Space))
-         (first-width (- 79 prefix-len))
-         (rest-width (- 79 (length cont-indent)))
-         (lines '())
-         (text-lines (split-sequence:split-sequence #\Newline message)))
-    (dolist (text-line text-lines)
-      (if (null lines)
-          ;; First line of first text-line
-          (if (<= (length text-line) first-width)
-              (push (concatenate 'string prefix text-line) lines)
-              (progn
-                (push (concatenate 'string prefix (subseq text-line 0 first-width)) lines)
-                (loop for pos from first-width below (length text-line) by rest-width
-                      do (push (concatenate 'string cont-indent
-                                            (subseq text-line pos
-                                                    (min (+ pos rest-width)
-                                                         (length text-line))))
-                               lines))))
-          ;; Continuation text-lines
-          (if (<= (length text-line) rest-width)
-              (push (concatenate 'string cont-indent text-line) lines)
-              (loop for pos from 0 below (length text-line) by rest-width
-                    do (push (concatenate 'string cont-indent
-                                          (subseq text-line pos
-                                                  (min (+ pos rest-width)
-                                                       (length text-line))))
-                             lines)))))
+         (first-width (- 80 prefix-len))
+         (rest-width (- 80 (length cont-indent)))
+         (wrapped (word-wrap message first-width))
+         (lines '()))
+    ;; First wrapped line gets the prefix
+    (push (concatenate 'string prefix (or (first wrapped) "")) lines)
+    ;; Remaining wrapped lines get continuation indent
+    (dolist (line (rest wrapped))
+      ;; Re-wrap if continuation is longer than rest-width
+      (if (<= (length line) rest-width)
+          (push (concatenate 'string cont-indent line) lines)
+          (dolist (sub (word-wrap line rest-width))
+            (push (concatenate 'string cont-indent sub) lines))))
     (nreverse lines)))
 
 (defun format-chat-messages (messages &optional current-username)

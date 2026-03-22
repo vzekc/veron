@@ -377,9 +377,8 @@
   (setf divider (format nil "~80,,,'-A" "--- /help "))
   (lspf:set-cursor 20 0)
   (unless (lspf:session-property lspf:*session* :chat-entered)
-    (setf (lspf:session-property lspf:*session* :chat-entered) t)
-    (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
-          "Daten werden geladen..."))
+    (setf (lspf:session-property lspf:*session* :chat-entered) t
+          (lspf:session-property lspf:*session* :chat-loading) t))
   (lspf:show-key :pf7 "Aeltere")
   (when (chat-scroll-position)
     (lspf:show-key :pf6 "Neueste")
@@ -415,6 +414,12 @@
     (when user (user-username user))))
 
 (lspf:define-dynamic-area-updater chat messages ()
+  (when (lspf:session-property lspf:*session* :chat-loading)
+    (setf (lspf:session-property lspf:*session* :chat-loading) nil)
+    (return-from lispf:update-dynamic-area
+      (append (make-list (1- +chat-display-lines+) :initial-element "")
+              (list (list :content "Daten werden geladen..."
+                          :color cl3270:+turquoise+)))))
   (let ((help-p (lspf:session-property lspf:*session* :chat-show-help)))
     (if help-p
         ;; Show help text

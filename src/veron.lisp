@@ -15,7 +15,7 @@
 
 ;;; Session class
 
-(defclass veron-session (lspf:session)
+(defclass veron-session (editor:editor-session)
   ((user :initform nil :accessor session-user)
    (term-type :initform "" :accessor session-term-type)
    (connect-time :initform (get-universal-time) :reader session-connect-time)
@@ -29,6 +29,11 @@
                      #P"screens/"
                      (asdf:system-source-directory :veron))
   :session-class 'veron-session)
+
+(pushnew (truename (merge-pathnames #P"editor/screens/"
+                                    (asdf:system-source-directory :lispf)))
+         (lispf::application-screen-directories *veron-app*)
+         :test #'equal)
 
 ;;; Application customization
 
@@ -277,6 +282,25 @@
   ;; Pop back past gaestebuch-neu to the guestbook list
   (pop (lspf:session-screen-stack lspf:*session*))
   :back)
+
+;;; Notizen (editor demo)
+
+(lspf:define-screen-update notizen ()
+  (let ((file-id (lspf:session-property lspf:*session* :editing-file-id)))
+    (cond
+      (file-id
+       ;; Returning from editor: save file back to DB and go back
+       (disk-to-file file-id)
+       (cleanup-tmp-file file-id)
+       (setf (lspf:session-property lspf:*session* :editing-file-id) nil)
+       :back)
+      (t
+       ;; Entering: load notes file and open editor
+       (let* ((user (session-user lspf:*session*))
+              (file-id (ensure-notes-file user))
+              (path (file-to-disk file-id)))
+         (setf (lspf:session-property lspf:*session* :editing-file-id) file-id)
+         (editor:edit-file path :display-name "Notizen"))))))
 
 ;;; Login log screen
 

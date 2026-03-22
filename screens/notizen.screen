@@ -1,0 +1,6 @@
+(:name "notizen"
+ :navigable t
+ :screen "
+"
+ :fields ()
+ :keys ((:pf3 "Zurueck" :back t)))

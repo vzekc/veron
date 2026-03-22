@@ -9,5 +9,6 @@
                              (:file "dotenv")
                              (:file "db")
                              (:file "user")
+                             (:file "files")
                              (:file "veron"))))
-  :depends-on (#:lispf #:woltlab-login #:postmodern))
+  :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern))

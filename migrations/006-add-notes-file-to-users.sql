@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN notes_file_id INTEGER REFERENCES files(id)

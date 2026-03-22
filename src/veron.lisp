@@ -439,7 +439,8 @@
             (chat-display-messages)
           (let* ((scrolled (chat-scroll-offset))
                  (my-name (current-username))
-                 (lines (format-chat-messages msgs my-name
+                 (lines (format-chat-messages msgs
+                                              :current-username my-name
                                               :start-of-log start-of-log-p
                                               :preceding-timestamp preceding-ts))
                  (n (length lines)))

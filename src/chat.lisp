@@ -192,8 +192,8 @@ Public: (<nick>) message  Private: *nick* message"
                   (nth-value 6 (decode-display-time universal-time)))
             day month year hour min "")))
 
-(defun format-chat-messages (messages &optional current-username
-                             &key start-of-log preceding-timestamp)
+(defun format-chat-messages (messages &key current-username
+                             start-of-log preceding-timestamp)
   "Format a list of message plists into display lines.
 Inserts a timestamp divider after 15+ minutes of silence.
 PRECEDING-TIMESTAMP is the time of the last message before this page,

@@ -35,12 +35,12 @@
   "Convert a PostgreSQL text array to a list of event keywords."
   (when (and pg-array (not (db-null-p pg-array)))
     (let ((strings (etypecase pg-array
-                     (vector (coerce pg-array 'list))
-                     (list pg-array)
                      (string
                       (let ((trimmed (string-trim '(#\{ #\}) pg-array)))
                         (when (plusp (length trimmed))
-                          (uiop:split-string trimmed :separator ",")))))))
+                          (uiop:split-string trimmed :separator ","))))
+                     (vector (coerce pg-array 'list))
+                     (list pg-array))))
       (mapcar #'string-to-event strings))))
 
 ;;; Subscription management

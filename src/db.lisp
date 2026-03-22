@@ -94,21 +94,34 @@
   "Return T if VALUE is a Postmodern NULL marker."
   (eq value :null))
 
+;;; Display timezone
+
+(defvar *display-timezone* nil
+  "Timezone offset for displaying timestamps.
+NIL means use the system's local timezone (handles DST automatically).
+Numeric values: -1 = CET (UTC+1), -2 = CEST (UTC+2), etc.")
+
+(defun decode-display-time (universal-time)
+  "Decode a universal time using the display timezone."
+  (if *display-timezone*
+      (decode-universal-time universal-time *display-timezone*)
+      (decode-universal-time universal-time)))
+
 (defun format-date (universal-time)
-  "Format a universal time as DD.MM.YYYY. Returns empty string for NULL."
+  "Format a universal time as DD.MM.YYYY in the display timezone."
   (if (or (null universal-time) (db-null-p universal-time))
       ""
       (multiple-value-bind (sec min hour day month year)
-          (decode-universal-time universal-time)
+          (decode-display-time universal-time)
         (declare (ignore sec min hour))
         (format nil "~2,'0D.~2,'0D.~4D" day month year))))
 
 (defun format-datetime (universal-time)
-  "Format a universal time as DD.MM.YYYY HH:MM. Returns empty string for NULL."
+  "Format a universal time as DD.MM.YYYY HH:MM in the display timezone."
   (if (or (null universal-time) (db-null-p universal-time))
       ""
       (multiple-value-bind (sec min hour day month year)
-          (decode-universal-time universal-time)
+          (decode-display-time universal-time)
         (declare (ignore sec))
         (format nil "~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D" day month year hour min))))
 

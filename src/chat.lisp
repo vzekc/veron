@@ -64,19 +64,19 @@
   "Number of lines available for chat message display (rows 1-17).")
 
 (defun format-time (universal-time)
-  "Format a universal time as HH:MM."
+  "Format a universal time as HH:MM in the display timezone."
   (if (or (null universal-time) (db-null-p universal-time))
       "     "
       (multiple-value-bind (sec min hour)
-          (decode-universal-time universal-time)
+          (decode-display-time universal-time)
         (declare (ignore sec))
         (format nil "~2,'0D:~2,'0D" hour min))))
 
 (defun message-date (universal-time)
-  "Return the date portion of a universal time as (day month year)."
+  "Return the date portion of a universal time in the display timezone."
   (when (and universal-time (not (db-null-p universal-time)))
     (multiple-value-bind (sec min hour day month year)
-        (decode-universal-time universal-time)
+        (decode-display-time universal-time)
       (declare (ignore sec min hour))
       (list day month year))))
 
@@ -119,23 +119,28 @@ Returns a list of strings."
                              lines)))))
     (nreverse lines)))
 
-(defun format-chat-messages (messages)
+(defun format-chat-messages (messages &optional current-username)
   "Format a list of message plists into display lines with date dividers.
+When CURRENT-USERNAME is given, highlight that user's messages.
 Returns a list of strings or plists (for colored lines)."
   (let ((lines '())
         (last-date nil))
     (dolist (msg messages)
       (let* ((timestamp (getf msg :created-at))
-             (date (message-date timestamp)))
+             (date (message-date timestamp))
+             (username (getf msg :username))
+             (own-p (and current-username
+                         (string-equal username current-username))))
         (when (and date (not (equal date last-date)))
           (push (list :content (format-date-divider (first date) (second date) (third date))
                       :color cl3270:+turquoise+)
                 lines)
           (setf last-date date))
-        (dolist (line (wrap-message-lines (getf msg :username)
-                                          (getf msg :message)
-                                          timestamp))
-          (push line lines))))
+        (dolist (line (wrap-message-lines username (getf msg :message) timestamp))
+          (push (if own-p
+                    (list :content line :color cl3270:+white+)
+                    line)
+                lines))))
     (nreverse lines)))
 
 ;;; Private messages

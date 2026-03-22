@@ -2,11 +2,13 @@
  :navigable t
  :screen "
 "
- :dynamic-areas ((:name messages :from (1 0) :to (17 78)))
- :fields ((:from (18 0) :len 79 :name divider :color pink)
-          (:from (19 0) :len 79 :name input1 :write t :color green :highlighting underscore)
-          (:from (20 0) :len 79 :name input2 :write t :color green :highlighting underscore))
+ :dynamic-areas ((:name messages :from (1 0) :to (17 79)))
+ :fields ((:from (17 79) :len 80 :name divider :color pink)
+          (:from (18 79) :len 80 :name input1 :write t :color green :highlighting underscore)
+          (:from (19 79) :len 80 :name input2 :write t :color green :highlighting underscore))
  :keys ((:enter "Senden")
+        (:pf1 "Hilfe" :hidden t)
         (:pf3 "Zurueck" :back t)
+        (:pf6 "Neueste" :hidden t)
         (:pf7 "Aeltere" :hidden t)
         (:pf8 "Neuere" :hidden t)))

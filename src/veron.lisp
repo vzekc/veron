@@ -380,7 +380,7 @@
     (setf (lspf:session-property lspf:*session* :chat-entered) t
           (lspf:session-property lspf:*session* :chat-loading) t))
   (lspf:show-key :pf7 "Aeltere")
-  (when (chat-scroll-position)
+  (when (chat-scroll-offset)
     (lspf:show-key :pf6 "Neueste")
     (lspf:show-key :pf8 "Neuere")))
 

@@ -45,6 +45,8 @@ PostgreSQL with sequential migrations in `migrations/`. The migration runner in 
 
 Tables: `users`, `logins`, `guestbook`, `files` (with BYTEA content and mime_type).
 
+*NEVER* edit migration files as they could already have been applied.  Create new migrations as needed.
+
 ### Submodules
 
 - `lispf/` - LISPF framework (screen registry, session management, key dispatch, editor)

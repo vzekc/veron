@@ -184,19 +184,19 @@ Returns a list of strings or plists (for colored lines)."
 
 (defun deliver-private-message (from-user to-username message)
   "Deliver a private message to a user's session. Returns T if delivered."
-  (let ((delivered nil))
+  (let ((delivered (cons nil nil)))
     (lspf:broadcast
      (lambda ()
        (let ((user (session-user lspf:*session*)))
          (when (and user (string-equal (user-username user) to-username))
            (let ((inbox (or (lspf:session-property lspf:*session* :chat-inbox) '())))
              (setf (lspf:session-property lspf:*session* :chat-inbox)
-                   (append inbox
-                           (list (list :username (format nil "~A (privat)" (user-username from-user))
-                                       :message message
-                                       :created-at (get-universal-time))))))
-           (setf delivered t)))))
-    delivered))
+                   (nconc inbox
+                          (list (list :username (format nil "~A (privat)" (user-username from-user))
+                                      :message message
+                                      :created-at (get-universal-time))))))
+           (setf (car delivered) t)))))
+    (car delivered)))
 
 (defun consume-private-messages ()
   "Return and clear pending private messages for the current session."

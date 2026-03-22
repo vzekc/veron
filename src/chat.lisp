@@ -118,8 +118,8 @@ EINER specifies the word for 1 (einer for feminine, einem for dative masculine).
       (format nil "~A ~A" einer singular)
       (format nil "~A ~A" (number-to-german n) plural)))
 
-(defun format-silence-divider (gap-seconds)
-  "Format a silence divider showing the duration in German words."
+(defun format-silence-duration (gap-seconds)
+  "Format a gap duration in German words."
   (let* ((total-minutes (floor gap-seconds 60))
          (days (floor total-minutes (* 24 60)))
          (hours (floor (mod total-minutes (* 24 60)) 60))
@@ -131,7 +131,19 @@ EINER specifies the word for 1 (einer for feminine, einem for dative masculine).
       (push (german-unit hours "Stunde" "Stunden") parts))
     (when (plusp days)
       (push (german-unit days "Tag" "Tagen" :einer "einem") parts))
-    (format nil "-- nach ~{~A~^, ~} Schweigen:" parts)))
+    (format nil "nach ~{~A~^, ~} Schweigen" parts)))
+
+(defun format-silence-divider (timestamp gap-seconds)
+  "Format a silence divider with absolute time and duration."
+  (multiple-value-bind (sec min hour day month year)
+      (decode-display-time timestamp)
+    (declare (ignore sec))
+    (let ((dow (aref #("Montag" "Dienstag" "Mittwoch" "Donnerstag"
+                        "Freitag" "Samstag" "Sonntag")
+                      (nth-value 6 (decode-display-time timestamp)))))
+      (format nil "-- ~A, ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D, ~A"
+              dow day month year hour min
+              (format-silence-duration gap-seconds)))))
 
 (defun word-wrap (text width)
   "Wrap TEXT to WIDTH characters, breaking at word boundaries when possible.
@@ -158,12 +170,18 @@ Returns a list of strings."
                            (setf pos end)))))))
     (nreverse lines)))
 
-(defun wrap-message-lines (username message &key private)
+(defun wrap-message-lines (username message &key private timestamp)
   "Format a chat message into display lines with word wrapping.
-Public: (<nick>) message  Private: *nick* message"
-  (let* ((prefix (if private
-                     (format nil "*~A* " username)
-                     (format nil "(~A) " username)))
+Public: HH:MM (<nick>) message  Private: HH:MM *nick* message"
+  (let* ((time-str (if timestamp
+                       (multiple-value-bind (sec min hour)
+                           (decode-display-time timestamp)
+                         (declare (ignore sec))
+                         (format nil "~2,'0D:~2,'0D " hour min))
+                       ""))
+         (prefix (if private
+                     (format nil "~A*~A* " time-str username)
+                     (format nil "~A(~A) " time-str username)))
          (prefix-len (length prefix))
          (cont-indent (make-string (min prefix-len 20) :initial-element #\Space))
          (first-width (- 80 prefix-len))
@@ -218,12 +236,13 @@ Returns a list of strings or plists (for colored lines)."
         ;; Insert silence divider if gap > 15 minutes
         (when (and last-time timestamp
                    (> (- timestamp last-time) +silence-threshold+))
-          (push (list :content (format-silence-divider (- timestamp last-time))
+          (push (list :content (format-silence-divider timestamp (- timestamp last-time))
                       :color cl3270:+turquoise+)
                 lines))
         (when timestamp (setf last-time timestamp))
         (dolist (line (wrap-message-lines username (getf msg :message)
-                                          :private private-p))
+                                          :private private-p
+                                          :timestamp timestamp))
           (push (cond (private-p (list :content line :color cl3270:+yellow+))
                       (own-p (list :content line :color cl3270:+white+))
                       (t line))

@@ -361,7 +361,7 @@
 
 (lspf:define-screen-update chat (divider)
   (setf divider "--- Alle oeffentlichen Nachrichten bleiben oeffentlich ---")
-  (lspf:set-cursor 20 0))
+  (lspf:set-cursor 20 1))
 
 (defun chat-channel-id ()
   "Return the chat channel ID for the current session, initializing if needed."

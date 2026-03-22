@@ -60,8 +60,8 @@
 
 ;;; Message formatting
 
-(defconstant +chat-display-lines+ 16
-  "Number of lines available for chat message display (rows 1-16).")
+(defconstant +chat-display-lines+ 17
+  "Number of lines available for chat message display (rows 1-17).")
 
 (defun format-time (universal-time)
   "Format a universal time as HH:MM."

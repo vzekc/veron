@@ -506,7 +506,10 @@ Treats the second line as a continuation of the first (no newline inserted)."
   (let* ((channel-id (chat-channel-id))
          (total (user-message-count channel-id))
          (offset (or (chat-scroll-offset) total))
-         (new-offset (max 0 (- offset +chat-display-lines+))))
+         ;; Minimum offset is total or display-lines (whichever is smaller)
+         ;; so the first page always shows a full screen of messages
+         (min-offset (min total +chat-display-lines+))
+         (new-offset (max min-offset (- offset +chat-display-lines+))))
     (when (< new-offset offset)
       (setf (lspf:session-property lspf:*session* :chat-scroll-offset)
             new-offset)))

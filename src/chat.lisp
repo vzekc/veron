@@ -231,9 +231,25 @@ Returns the per-user buffer."
 
 ;;; Private messages
 
+(defun insert-message-sorted (buf msg)
+  "Insert MSG into BUF at the correct chronological position.
+Scans from the end since new messages typically belong near the tail."
+  (let ((ts (getf msg :created-at))
+        (len (length buf)))
+    (vector-push-extend nil buf)
+    ;; Shift elements right until we find the insertion point
+    (let ((pos (1- len)))
+      (loop while (and (>= pos 0)
+                       (let ((existing-ts (getf (aref buf pos) :created-at)))
+                         (and existing-ts (> existing-ts ts))))
+            do (setf (aref buf (1+ pos)) (aref buf pos))
+               (decf pos))
+      (setf (aref buf (1+ pos)) msg))))
+
 (defun deliver-private-message (from-user to-username message)
   "Deliver a private message to a user's session. Returns T if delivered.
-The message is inserted into the recipient's per-user chat buffer."
+The message is inserted into the recipient's per-user chat buffer in
+chronological order."
   (let ((delivered (cons nil nil)))
     (lspf:broadcast
      (lambda ()
@@ -243,6 +259,6 @@ The message is inserted into the recipient's per-user chat buffer."
                             :message message
                             :created-at (get-universal-time)
                             :private t)))
-             (vector-push-extend msg (user-chat-buffer)))
+             (insert-message-sorted (user-chat-buffer) msg))
            (setf (car delivered) t)))))
     (car delivered)))

@@ -179,48 +179,79 @@ Returns a list of strings or plists (for colored lines)."
              (date (message-date timestamp))
              (username (getf msg :username))
              (own-p (and current-username
-                         (string-equal username current-username))))
+                         (string-equal username current-username)))
+             (private-p (getf msg :private)))
         (when (and date (not (equal date last-date)))
           (push (list :content (format-date-divider (first date) (second date) (third date))
                       :color cl3270:+turquoise+)
                 lines)
           (setf last-date date))
         (dolist (line (wrap-message-lines username (getf msg :message) timestamp))
-          (push (if own-p
-                    (list :content line :color cl3270:+white+)
-                    line)
+          (push (cond (private-p (list :content line :color cl3270:+yellow+))
+                      (own-p (list :content line :color cl3270:+white+))
+                      (t line))
                 lines))))
     (nreverse lines)))
+
+;;; Per-user message buffer
+;;;
+;;; Each session maintains its own message buffer that merges public
+;;; messages from the shared channel buffer with private messages.
+;;; The buffer is lazily populated from the shared buffer and syncs
+;;; new public messages on each access.
+
+(defun user-chat-buffer ()
+  "Return the per-user chat buffer for the current session, creating if needed."
+  (or (lspf:session-property lspf:*session* :chat-user-buffer)
+      (setf (lspf:session-property lspf:*session* :chat-user-buffer)
+            (make-array 0 :adjustable t :fill-pointer 0))))
+
+(defun sync-user-chat-buffer (channel-id)
+  "Sync the per-user buffer with new public messages from the shared channel buffer.
+Returns the per-user buffer."
+  (let* ((buf (user-chat-buffer))
+         (synced (or (lspf:session-property lspf:*session* :chat-sync-index) 0))
+         (shared (channel-messages channel-id))
+         (shared-len (length shared)))
+    (when (< synced shared-len)
+      (loop for i from synced below shared-len
+            do (vector-push-extend (aref shared i) buf))
+      (setf (lspf:session-property lspf:*session* :chat-sync-index) shared-len))
+    buf))
+
+(defun user-message-count (channel-id)
+  "Return the number of messages in the per-user buffer."
+  (length (sync-user-chat-buffer channel-id)))
+
+(defun user-messages-slice (channel-id start end)
+  "Return messages from the per-user buffer, index START to END (exclusive)."
+  (let* ((buf (sync-user-chat-buffer channel-id))
+         (len (length buf)))
+    (coerce (subseq buf (max 0 (min start len))
+                    (max 0 (min end len)))
+            'list)))
+
+(defun user-messages-tail (channel-id count)
+  "Return the last COUNT messages from the per-user buffer."
+  (let* ((buf (sync-user-chat-buffer channel-id))
+         (len (length buf))
+         (start (max 0 (- len count))))
+    (coerce (subseq buf start len) 'list)))
 
 ;;; Private messages
 
 (defun deliver-private-message (from-user to-username message)
-  "Deliver a private message to a user's session. Returns T if delivered."
+  "Deliver a private message to a user's session. Returns T if delivered.
+The message is inserted into the recipient's per-user chat buffer."
   (let ((delivered (cons nil nil)))
     (lspf:broadcast
      (lambda ()
        (let ((user (session-user lspf:*session*)))
          (when (and user (string-equal (user-username user) to-username))
-           (let ((inbox (or (lspf:session-property lspf:*session* :chat-inbox) '())))
-             (setf (lspf:session-property lspf:*session* :chat-inbox)
-                   (nconc inbox
-                          (list (list :username (format nil "~A (privat)" (user-username from-user))
-                                      :message message
-                                      :created-at (get-universal-time))))))
+           (let ((msg (list :username (format nil "~A (privat)" (user-username from-user))
+                            :message message
+                            :created-at (get-universal-time)
+                            :private t)))
+             (vector-push-extend msg (user-chat-buffer)))
            (setf (car delivered) t)))))
     (car delivered)))
-
-(defun collect-private-messages ()
-  "Move any new private messages from inbox to the visible list.
-Returns the full visible private message list."
-  (let ((inbox (lspf:session-property lspf:*session* :chat-inbox)))
-    (when inbox
-      (setf (lspf:session-property lspf:*session* :chat-inbox) nil)
-      (setf (lspf:session-property lspf:*session* :chat-private-visible)
-            (nconc (or (lspf:session-property lspf:*session* :chat-private-visible) '())
-                   inbox)))
-    (lspf:session-property lspf:*session* :chat-private-visible)))
-
-(defun clear-private-messages ()
-  "Clear the visible private message list."
-  (setf (lspf:session-property lspf:*session* :chat-private-visible) nil))

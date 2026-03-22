@@ -398,15 +398,11 @@
 (defun chat-display-messages ()
   "Return messages to display based on scroll position."
   (let* ((channel-id (chat-channel-id))
-         (offset (chat-scroll-offset))
-         (private-msgs (collect-private-messages)))
+         (offset (chat-scroll-offset)))
     (if offset
         (let* ((start (max 0 (- offset +chat-display-lines+))))
-          (chat-messages-slice channel-id start offset))
-        (let ((msgs (chat-messages-tail channel-id +chat-display-lines+)))
-          (if private-msgs
-              (append msgs private-msgs)
-              msgs)))))
+          (user-messages-slice channel-id start offset))
+        (user-messages-tail channel-id +chat-display-lines+))))
 
 (defun current-username ()
   "Return the current session's username."
@@ -480,7 +476,6 @@ Treats the second line as a continuation of the first (no newline inserted)."
     ;; Regular message
     (let ((user (session-user lspf:*session*)))
       (add-chat-message (chat-channel-id) user text))
-    (clear-private-messages)
     (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil))
   :stay)
 
@@ -498,7 +493,7 @@ Treats the second line as a continuation of the first (no newline inserted)."
   (when (lspf:session-property lspf:*session* :chat-show-help)
     (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
   (let* ((channel-id (chat-channel-id))
-         (total (chat-message-count channel-id))
+         (total (user-message-count channel-id))
          (offset (or (chat-scroll-offset) total))
          (new-offset (max 0 (- offset +chat-display-lines+))))
     (when (< new-offset offset)
@@ -513,7 +508,7 @@ Treats the second line as a continuation of the first (no newline inserted)."
     (unless offset
       (return-from lspf:handle-key :stay))
     (let* ((channel-id (chat-channel-id))
-           (total (chat-message-count channel-id))
+           (total (user-message-count channel-id))
            (new-offset (+ offset +chat-display-lines+)))
       (if (>= new-offset total)
           (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil)

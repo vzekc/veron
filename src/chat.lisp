@@ -100,26 +100,13 @@
 (defconstant +chat-display-lines+ 17
   "Number of lines available for chat message display (rows 1-17).")
 
-(defun format-time (universal-time)
-  "Format a universal time as HH:MM in the display timezone."
-  (if (or (null universal-time) (db-null-p universal-time))
-      "     "
-      (multiple-value-bind (sec min hour)
-          (decode-display-time universal-time)
-        (declare (ignore sec))
-        (format nil "~2,'0D:~2,'0D" hour min))))
-
-(defun message-date (universal-time)
-  "Return the date portion of a universal time in the display timezone."
-  (when (and universal-time (not (db-null-p universal-time)))
-    (multiple-value-bind (sec min hour day month year)
-        (decode-display-time universal-time)
-      (declare (ignore sec min hour))
-      (list day month year))))
-
-(defun format-date-divider (day month year)
-  "Format a date divider line."
-  (format nil "--- ~2,'0D.~2,'0D.~4D ~53,,,'-A" day month year ""))
+(defun format-timestamp-divider (universal-time)
+  "Format a silence divider showing date and time."
+  (multiple-value-bind (sec min hour day month year)
+      (decode-display-time universal-time)
+    (declare (ignore sec))
+    (format nil "--- ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D ~49,,,'-A"
+            day month year hour min "")))
 
 (defun word-wrap (text width)
   "Wrap TEXT to WIDTH characters, breaking at word boundaries when possible.
@@ -146,47 +133,51 @@ Returns a list of strings."
                            (setf pos end)))))))
     (nreverse lines)))
 
-(defun wrap-message-lines (username message timestamp)
+(defun wrap-message-lines (username message &key private)
   "Format a chat message into display lines with word wrapping.
-Returns a list of strings."
-  (let* ((time-str (format-time timestamp))
-         (prefix (format nil "~A ~A: " time-str username))
+Public: (<nick>) message  Private: *nick* message"
+  (let* ((prefix (if private
+                     (format nil "*~A* " username)
+                     (format nil "(~A) " username)))
          (prefix-len (length prefix))
          (cont-indent (make-string (min prefix-len 20) :initial-element #\Space))
          (first-width (- 80 prefix-len))
          (rest-width (- 80 (length cont-indent)))
          (wrapped (word-wrap message first-width))
          (lines '()))
-    ;; First wrapped line gets the prefix
     (push (concatenate 'string prefix (or (first wrapped) "")) lines)
-    ;; Remaining wrapped lines get continuation indent
     (dolist (line (rest wrapped))
-      ;; Re-wrap if continuation is longer than rest-width
       (if (<= (length line) rest-width)
           (push (concatenate 'string cont-indent line) lines)
           (dolist (sub (word-wrap line rest-width))
             (push (concatenate 'string cont-indent sub) lines))))
     (nreverse lines)))
 
+(defconstant +silence-threshold+ (* 15 60)
+  "Seconds of silence before inserting a timestamp divider.")
+
 (defun format-chat-messages (messages &optional current-username)
-  "Format a list of message plists into display lines with date dividers.
+  "Format a list of message plists into display lines.
+Inserts a timestamp divider after 15+ minutes of silence.
 When CURRENT-USERNAME is given, highlight that user's messages.
 Returns a list of strings or plists (for colored lines)."
   (let ((lines '())
-        (last-date nil))
+        (last-time nil))
     (dolist (msg messages)
       (let* ((timestamp (getf msg :created-at))
-             (date (message-date timestamp))
              (username (getf msg :username))
-             (own-p (and current-username
-                         (string-equal username current-username)))
-             (private-p (getf msg :private)))
-        (when (and date (not (equal date last-date)))
-          (push (list :content (format-date-divider (first date) (second date) (third date))
+             (private-p (getf msg :private))
+             (own-p (and current-username (not private-p)
+                         (string-equal username current-username))))
+        ;; Insert silence divider if gap > 15 minutes
+        (when (and last-time timestamp
+                   (> (- timestamp last-time) +silence-threshold+))
+          (push (list :content (format-timestamp-divider timestamp)
                       :color cl3270:+turquoise+)
-                lines)
-          (setf last-date date))
-        (dolist (line (wrap-message-lines username (getf msg :message) timestamp))
+                lines))
+        (when timestamp (setf last-time timestamp))
+        (dolist (line (wrap-message-lines username (getf msg :message)
+                                          :private private-p))
           (push (cond (private-p (list :content line :color cl3270:+yellow+))
                       (own-p (list :content line :color cl3270:+white+))
                       (t line))

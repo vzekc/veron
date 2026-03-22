@@ -400,9 +400,14 @@
   (let* ((channel-id (chat-channel-id))
          (offset (chat-scroll-offset)))
     (if offset
-        (let* ((start (max 0 (- offset +chat-display-lines+))))
-          (values (user-messages-slice channel-id start offset)
-                  (zerop start)))
+        (let* ((start (max 0 (- offset +chat-display-lines+)))
+               (at-start (zerop start)))
+          ;; Leave room for the header line at the start of the log
+          (values (user-messages-slice channel-id start
+                                      (if at-start
+                                          (min offset (1- +chat-display-lines+))
+                                          offset))
+                  at-start))
         (values (user-messages-tail channel-id +chat-display-lines+)
                 nil))))
 

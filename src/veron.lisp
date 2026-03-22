@@ -357,6 +357,117 @@
              "Gespeichert")))
     :stay))
 
+;;; Chat screen
+
+(lspf:define-screen-update chat (divider)
+  (setf divider "--- Alle oeffentlichen Nachrichten bleiben oeffentlich ---")
+  (lspf:set-cursor 20 0))
+
+(defun chat-channel-id ()
+  "Return the chat channel ID for the current session, initializing if needed."
+  (or (lspf:session-property lspf:*session* :chat-channel-id)
+      (let ((id (default-channel-id)))
+        (setf (lspf:session-property lspf:*session* :chat-channel-id) id)
+        id)))
+
+(defun chat-scroll-position ()
+  "Return the current scroll anchor message ID, or NIL for latest."
+  (lspf:session-property lspf:*session* :chat-scroll-id))
+
+(defun chat-display-messages ()
+  "Return messages to display based on scroll position, plus any private messages."
+  (let* ((channel-id (chat-channel-id))
+         (scroll-id (chat-scroll-position))
+         (db-msgs (if scroll-id
+                      (chat-messages-before channel-id (1+ scroll-id)
+                                            +chat-display-lines+)
+                      (chat-messages-latest channel-id +chat-display-lines+)))
+         (private-msgs (consume-private-messages)))
+    (if (and (null scroll-id) private-msgs)
+        (append db-msgs private-msgs)
+        db-msgs)))
+
+(lspf:define-dynamic-area-updater chat messages ()
+  (let* ((msgs (chat-display-messages))
+         (lines (format-chat-messages msgs))
+         (n (length lines)))
+    ;; Pad to fill display, showing messages at the bottom
+    (if (<= n +chat-display-lines+)
+        (append (make-list (- +chat-display-lines+ n) :initial-element "")
+                lines)
+        (last lines +chat-display-lines+))))
+
+(defun parse-chat-input (input1 input2)
+  "Combine two input lines into a single message string, trimming trailing blanks."
+  (let* ((line1 (string-right-trim '(#\Space) input1))
+         (line2 (string-right-trim '(#\Space) input2)))
+    (if (plusp (length line2))
+        (concatenate 'string line1 (string #\Newline) line2)
+        line1)))
+
+(lspf:define-key-handler chat :enter (input1 input2)
+  (let ((text (parse-chat-input (or input1 "") (or input2 "")))
+        (context (lspf:session-context lspf:*session*)))
+    ;; Clear input fields for next display
+    (setf (gethash "input1" context) ""
+          (gethash "input2" context) "")
+    (when (string= (string-trim '(#\Space) text) "")
+      (return-from lspf:handle-key :stay))
+    ;; Handle /msg command
+    (when (and (>= (length text) 5)
+               (string-equal (subseq text 0 4) "/msg"))
+      (let* ((rest (string-trim '(#\Space) (subseq text 4)))
+             (space-pos (position #\Space rest)))
+        (unless space-pos
+          (lspf:application-error "/msg <Name> <Nachricht>"))
+        (let ((recipient (subseq rest 0 space-pos))
+              (msg (string-trim '(#\Space) (subseq rest (1+ space-pos)))))
+          (when (string= msg "")
+            (lspf:application-error "/msg <Name> <Nachricht>"))
+          (let ((user (session-user lspf:*session*)))
+            (unless (deliver-private-message user recipient msg)
+              (lspf:application-error
+               (format nil "~A ist nicht online" recipient))))
+          (return-from lspf:handle-key :stay))))
+    ;; Regular message
+    (let ((user (session-user lspf:*session*)))
+      (add-chat-message (chat-channel-id) user text))
+    ;; Reset scroll to latest
+    (setf (lspf:session-property lspf:*session* :chat-scroll-id) nil))
+  :stay)
+
+(lspf:define-key-handler chat :pf7 ()
+  ;; Scroll to older messages
+  (let* ((channel-id (chat-channel-id))
+         (scroll-id (chat-scroll-position))
+         (msgs (if scroll-id
+                   (chat-messages-before channel-id (1+ scroll-id)
+                                         +chat-display-lines+)
+                   (chat-messages-latest channel-id +chat-display-lines+))))
+    (when msgs
+      (setf (lspf:session-property lspf:*session* :chat-scroll-id)
+            (getf (first msgs) :id))))
+  :stay)
+
+(lspf:define-key-handler chat :pf8 ()
+  ;; Scroll to newer messages
+  (let ((scroll-id (chat-scroll-position)))
+    (unless scroll-id
+      (return-from lspf:handle-key :stay))
+    (let* ((channel-id (chat-channel-id))
+           (newer (chat-messages-after channel-id scroll-id +chat-display-lines+)))
+      (if newer
+          (let ((newest-id (getf (car (last newer)) :id))
+                (channel-newest (chat-newest-id channel-id)))
+            ;; If we've reached the end, go back to live mode
+            (if (>= newest-id channel-newest)
+                (setf (lspf:session-property lspf:*session* :chat-scroll-id) nil)
+                (setf (lspf:session-property lspf:*session* :chat-scroll-id)
+                      newest-id)))
+          ;; No newer messages, go to live mode
+          (setf (lspf:session-property lspf:*session* :chat-scroll-id) nil))))
+  :stay)
+
 ;;; Login log screen
 
 (lspf:define-list-data-getter protokoll (start end)

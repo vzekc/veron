@@ -1,8 +1,9 @@
 (:name "main"
  :title "Hauptmenue"
  :items ((:key "1" :label "Gaestebuch" :description "Eintraege lesen und schreiben" :screen gaestebuch)
-         (:key "2" :label "Wer ist da?" :description "Aktive Sitzungen anzeigen" :screen who)
-         (:key "3" :label "Protokoll" :description "Anmeldeprotokoll" :screen protokoll)
-         (:key "4" :label "Editor" :description "LISPF Editor Demo" :screen notizen)
-         (:key "5" :label "Meldungen" :description "Push-Benachrichtigungen" :screen benachrichtigungen)
-         (:key "6" :label "Ueber" :description "Ueber VERON und den V.z.E.k.C." :screen about)))
+         (:key "2" :label "Chat" :description "Oeffentlicher Chat" :screen chat)
+         (:key "3" :label "Wer ist da?" :description "Aktive Sitzungen anzeigen" :screen who)
+         (:key "4" :label "Protokoll" :description "Anmeldeprotokoll" :screen protokoll)
+         (:key "5" :label "Editor" :description "LISPF Editor Demo" :screen notizen)
+         (:key "6" :label "Meldungen" :description "Push-Benachrichtigungen" :screen benachrichtigungen)
+         (:key "7" :label "Ueber" :description "Ueber VERON und den V.z.E.k.C." :screen about)))

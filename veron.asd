@@ -11,5 +11,6 @@
                              (:file "user")
                              (:file "files")
                              (:file "notifications")
+                             (:file "chat")
                              (:file "veron"))))
   :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern #:dexador))

@@ -376,6 +376,10 @@
 (lspf:define-screen-update chat (divider)
   (setf divider (format nil "~80,,,'-A" "--- /help "))
   (lspf:set-cursor 20 0)
+  (unless (lspf:session-property lspf:*session* :chat-entered)
+    (setf (lspf:session-property lspf:*session* :chat-entered) t)
+    (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+          "Daten werden geladen..."))
   (lspf:show-key :pf7 "Aeltere")
   (when (chat-scroll-position)
     (lspf:show-key :pf6 "Neueste")
@@ -443,8 +447,11 @@
     (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
   (let ((text (parse-chat-input (or input1 "") (or input2 "")))
         (context (lspf:session-context lspf:*session*)))
+    ;; Clear input fields in both context and current field values
     (setf (gethash "input1" context) ""
-          (gethash "input2" context) "")
+          (gethash "input2" context) ""
+          (gethash "input1" lspf:*current-field-values*) ""
+          (gethash "input2" lspf:*current-field-values*) "")
     (when (string= (string-trim '(#\Space) text) "")
       (return-from lspf:handle-key :stay))
     ;; Handle /help command

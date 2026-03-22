@@ -379,10 +379,12 @@
   (unless (lspf:session-property lspf:*session* :chat-entered)
     (setf (lspf:session-property lspf:*session* :chat-entered) t
           (lspf:session-property lspf:*session* :chat-loading) t))
-  (lspf:show-key :pf7 "Aeltere")
-  (when (chat-scroll-offset)
-    (lspf:show-key :pf6 "Neueste")
-    (lspf:show-key :pf8 "Neuere")))
+  (let ((total (length (chat-all-formatted-lines))))
+    (when (> total +chat-display-lines+)
+      (lspf:show-key :pf7 "Aeltere"))
+    (when (chat-scroll-offset)
+      (lspf:show-key :pf6 "Neueste")
+      (lspf:show-key :pf8 "Neuere"))))
 
 (defun chat-channel-id ()
   "Return the chat channel ID for the current session, initializing if needed."
@@ -392,33 +394,18 @@
         id)))
 
 (defun chat-scroll-offset ()
-  "Return the scroll offset (end index into message buffer), or NIL for latest."
+  "Return the scroll offset (end line index), or NIL for latest."
   (lspf:session-property lspf:*session* :chat-scroll-offset))
 
-(defun chat-preceding-timestamp (channel-id start)
-  "Return the timestamp of the message just before START index, or NIL."
-  (when (plusp start)
-    (let ((prev (user-messages-slice channel-id (1- start) start)))
-      (when prev (getf (first prev) :created-at)))))
-
-(defun chat-display-messages ()
-  "Return (values messages start-of-log-p preceding-timestamp) based on scroll."
+(defun chat-all-formatted-lines ()
+  "Format all messages in the per-user buffer into display lines.
+Returns the full list of formatted lines."
   (let* ((channel-id (chat-channel-id))
-         (offset (chat-scroll-offset)))
-    (if offset
-        (let* ((start (max 0 (- offset +chat-display-lines+)))
-               (at-start (zerop start)))
-          (values (user-messages-slice channel-id start
-                                      (if at-start
-                                          (min offset (1- +chat-display-lines+))
-                                          offset))
-                  at-start
-                  (chat-preceding-timestamp channel-id start)))
-        (let* ((total (user-message-count channel-id))
-               (start (max 0 (- total +chat-display-lines+))))
-          (values (user-messages-tail channel-id +chat-display-lines+)
-                  nil
-                  (chat-preceding-timestamp channel-id start))))))
+         (msgs (coerce (sync-user-chat-buffer channel-id) 'list))
+         (my-name (current-username)))
+    (format-chat-messages msgs
+                          :current-username my-name
+                          :start-of-log t)))
 
 (defun current-username ()
   "Return the current session's username."
@@ -435,26 +422,25 @@
                             (list :content line :color cl3270:+turquoise+))
                           *chat-help-text*)))
         ;; Show chat messages
-        (multiple-value-bind (msgs start-of-log-p preceding-ts)
-            (chat-display-messages)
-          (let* ((scrolled (chat-scroll-offset))
-                 (my-name (current-username))
-                 (lines (format-chat-messages msgs
-                                              :current-username my-name
-                                              :start-of-log start-of-log-p
-                                              :preceding-timestamp preceding-ts))
-                 (n (length lines)))
-            (cond
-              ;; Scrolled back: top-align
-              ((and scrolled (<= n +chat-display-lines+))
-               (append lines
-                       (make-list (- +chat-display-lines+ n) :initial-element "")))
-              ;; Live view: bottom-align
-              ((<= n +chat-display-lines+)
-               (append (make-list (- +chat-display-lines+ n) :initial-element "")
-                       lines))
-              ;; More lines than display: show last page
-              (t (last lines +chat-display-lines+))))))))
+        (let* ((all-lines (chat-all-formatted-lines))
+               (total (length all-lines))
+               (offset (chat-scroll-offset)))
+          (cond
+            ;; Scrolled back: show page ending at offset
+            (offset
+             (let* ((end (min offset total))
+                    (start (max 0 (- end +chat-display-lines+)))
+                    (page (subseq all-lines start end))
+                    (n (length page)))
+               (if (< n +chat-display-lines+)
+                   (append page
+                           (make-list (- +chat-display-lines+ n) :initial-element ""))
+                   page)))
+            ;; Live view: bottom-align last page
+            ((<= total +chat-display-lines+)
+             (append (make-list (- +chat-display-lines+ total) :initial-element "")
+                     all-lines))
+            (t (last all-lines +chat-display-lines+)))))))
 
 (defun parse-chat-input (input1 input2)
   "Combine two input lines into a single message string.
@@ -520,13 +506,10 @@ Treats the second line as a continuation of the first (no newline inserted)."
 (lspf:define-key-handler chat :pf7 ()
   (when (lspf:session-property lspf:*session* :chat-show-help)
     (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
-  (let* ((channel-id (chat-channel-id))
-         (total (user-message-count channel-id))
+  (let* ((all-lines (chat-all-formatted-lines))
+         (total (length all-lines))
          (offset (or (chat-scroll-offset) total))
-         ;; Minimum offset is total or display-lines (whichever is smaller)
-         ;; so the first page always shows a full screen of messages
-         (min-offset (min total +chat-display-lines+))
-         (new-offset (max min-offset (- offset +chat-display-lines+))))
+         (new-offset (max +chat-display-lines+ (- offset +chat-display-lines+))))
     (when (< new-offset offset)
       (setf (lspf:session-property lspf:*session* :chat-scroll-offset)
             new-offset)))
@@ -538,8 +521,8 @@ Treats the second line as a continuation of the first (no newline inserted)."
   (let ((offset (chat-scroll-offset)))
     (unless offset
       (return-from lspf:handle-key :stay))
-    (let* ((channel-id (chat-channel-id))
-           (total (user-message-count channel-id))
+    (let* ((all-lines (chat-all-formatted-lines))
+           (total (length all-lines))
            (new-offset (+ offset +chat-display-lines+)))
       (if (>= new-offset total)
           (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil)

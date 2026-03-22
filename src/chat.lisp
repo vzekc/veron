@@ -181,13 +181,32 @@ Public: (<nick>) message  Private: *nick* message"
 (defconstant +silence-threshold+ (* 15 60)
   "Seconds of silence before inserting a timestamp divider.")
 
-(defun format-chat-messages (messages &optional current-username)
+(defun format-absolute-timestamp (universal-time)
+  "Format a universal time as a German absolute timestamp header."
+  (multiple-value-bind (sec min hour day month year)
+      (decode-display-time universal-time)
+    (declare (ignore sec))
+    (format nil "--- ~A, ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D ~44,,,'-A"
+            (aref #("Montag" "Dienstag" "Mittwoch" "Donnerstag"
+                    "Freitag" "Samstag" "Sonntag")
+                  (nth-value 6 (decode-display-time universal-time)))
+            day month year hour min "")))
+
+(defun format-chat-messages (messages &optional current-username
+                             &key start-of-log)
   "Format a list of message plists into display lines.
 Inserts a timestamp divider after 15+ minutes of silence.
+When START-OF-LOG is true, prepends the absolute timestamp of the first message.
 When CURRENT-USERNAME is given, highlight that user's messages.
 Returns a list of strings or plists (for colored lines)."
   (let ((lines '())
         (last-time nil))
+    (when (and start-of-log messages)
+      (let ((first-ts (getf (first messages) :created-at)))
+        (when first-ts
+          (push (list :content (format-absolute-timestamp first-ts)
+                      :color cl3270:+turquoise+)
+                lines))))
     (dolist (msg messages)
       (let* ((timestamp (getf msg :created-at))
              (username (getf msg :username))

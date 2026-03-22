@@ -396,13 +396,15 @@
   (lspf:session-property lspf:*session* :chat-scroll-offset))
 
 (defun chat-display-messages ()
-  "Return messages to display based on scroll position."
+  "Return (values messages start-of-log-p) based on scroll position."
   (let* ((channel-id (chat-channel-id))
          (offset (chat-scroll-offset)))
     (if offset
         (let* ((start (max 0 (- offset +chat-display-lines+))))
-          (user-messages-slice channel-id start offset))
-        (user-messages-tail channel-id +chat-display-lines+))))
+          (values (user-messages-slice channel-id start offset)
+                  (zerop start)))
+        (values (user-messages-tail channel-id +chat-display-lines+)
+                nil))))
 
 (defun current-username ()
   "Return the current session's username."
@@ -419,14 +421,23 @@
                             (list :content line :color cl3270:+turquoise+))
                           *chat-help-text*)))
         ;; Show chat messages
-        (let* ((msgs (chat-display-messages))
-               (my-name (current-username))
-               (lines (format-chat-messages msgs my-name))
-               (n (length lines)))
-          (if (<= n +chat-display-lines+)
-              (append (make-list (- +chat-display-lines+ n) :initial-element "")
-                      lines)
-              (last lines +chat-display-lines+))))))
+        (multiple-value-bind (msgs start-of-log-p) (chat-display-messages)
+          (let* ((scrolled (chat-scroll-offset))
+                 (my-name (current-username))
+                 (lines (format-chat-messages msgs my-name
+                                              :start-of-log start-of-log-p))
+                 (n (length lines)))
+            (cond
+              ;; Scrolled back: top-align
+              ((and scrolled (<= n +chat-display-lines+))
+               (append lines
+                       (make-list (- +chat-display-lines+ n) :initial-element "")))
+              ;; Live view: bottom-align
+              ((<= n +chat-display-lines+)
+               (append (make-list (- +chat-display-lines+ n) :initial-element "")
+                       lines))
+              ;; More lines than display: show last page
+              (t (last lines +chat-display-lines+))))))))
 
 (defun parse-chat-input (input1 input2)
   "Combine two input lines into a single message string.

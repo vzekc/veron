@@ -24,16 +24,12 @@
 ;;; Application definition
 
 (lspf:define-application *veron-app*
+  :title "VERON"
   :entry-screen login
   :screen-directory (merge-pathnames
                      #P"screens/"
                      (asdf:system-source-directory :veron))
   :session-class 'veron-session)
-
-(pushnew (truename (merge-pathnames #P"editor/screens/"
-                                    (asdf:system-source-directory :lispf)))
-         (lispf::application-screen-directories *veron-app*)
-         :test #'equal)
 
 ;;; Application customization
 
@@ -117,29 +113,35 @@
 
 ;;; Who's online screen
 
-(defun session-list ()
-  "Return a list of plists describing all active sessions."
+(defun format-session-line (index session now)
+  "Format a single session line for the who display."
+  (let* ((user (session-user session))
+         (active-app (lspf:session-active-application session))
+         (username (if user (user-username user) "(login)"))
+         (app-name (if active-app
+                       (or (lspf:application-title active-app)
+                           (lspf:application-name active-app))
+                       ""))
+         (screen (string-downcase
+                  (string (lspf:session-current-screen session))))
+         (connected (format-duration (- now (session-connect-time session)))))
+    (format nil "~3D. ~16A ~8A ~15A ~A"
+            (1+ index) username app-name screen connected)))
+
+(lspf:define-dynamic-area-updater who sessions ()
   (let ((now (get-universal-time))
-        (sessions '()))
+        (lines '())
+        (index 0))
     (bt:with-lock-held ((lspf::application-sessions-lock lspf:*application*))
       (dolist (s (lspf::application-sessions lspf:*application*))
-        (let ((user (session-user s)))
-          (push (list :user (if user (user-username user) "(login)")
-                      :screen (string-downcase
-                               (string (lspf:session-current-screen s)))
-                      :connected (format-duration
-                                  (- now (session-connect-time s))))
-                sessions))))
-    (nreverse sessions)))
-
-(lspf:define-list-data-getter who (start end)
-  (let* ((all (session-list))
-         (total (length all))
-         (page (subseq all start (min end total))))
-    (values (loop for rec in page
-                  for i from start
-                  collect (list* :num (format nil "~D." (1+ i)) rec))
-            total)))
+        (let ((line (format-session-line index s now))
+              (current-p (eq s lspf:*session*)))
+          (push (if current-p
+                    (list :content line :color cl3270:+white+ :intense t)
+                    line)
+                lines))
+        (incf index)))
+    (nreverse lines)))
 
 ;;; Guestbook screens
 
@@ -286,21 +288,13 @@
 ;;; Notizen (editor demo)
 
 (lspf:define-screen-update notizen ()
-  (let ((file-id (lspf:session-property lspf:*session* :editing-file-id)))
-    (cond
-      (file-id
-       ;; Returning from editor: save file back to DB and go back
-       (disk-to-file file-id)
-       (cleanup-tmp-file file-id)
-       (setf (lspf:session-property lspf:*session* :editing-file-id) nil)
-       :back)
-      (t
-       ;; Entering: load notes file and open editor
-       (let* ((user (session-user lspf:*session*))
-              (file-id (ensure-notes-file user))
-              (path (file-to-disk file-id)))
-         (setf (lspf:session-property lspf:*session* :editing-file-id) file-id)
-         (editor:edit-file path :display-name "Notizen"))))))
+  (let* ((user (session-user lspf:*session*))
+         (file-id (ensure-notes-file user))
+         (path (file-to-disk file-id)))
+    (editor:edit-file path :display-name "Notizen")
+    (disk-to-file file-id)
+    (cleanup-tmp-file file-id)
+    :back))
 
 ;;; Login log screen
 

@@ -239,7 +239,7 @@ The message is inserted into the recipient's per-user chat buffer."
      (lambda ()
        (let ((user (session-user lspf:*session*)))
          (when (and user (string-equal (user-username user) to-username))
-           (let ((msg (list :username (format nil "~A (privat)" (user-username from-user))
+           (let ((msg (list :username (user-username from-user)
                             :message message
                             :created-at (get-universal-time)
                             :private t)))

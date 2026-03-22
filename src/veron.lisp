@@ -452,11 +452,12 @@
     (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
   (let ((text (parse-chat-input (or input1 "") (or input2 "")))
         (context (lspf:session-context lspf:*session*)))
-    ;; Clear input fields in both context and current field values
-    (setf (gethash "input1" context) ""
-          (gethash "input2" context) ""
-          (gethash "input1" lspf:*current-field-values*) ""
-          (gethash "input2" lspf:*current-field-values*) "")
+    ;; Clear input fields with spaces (needed for no-clear redisplay)
+    (let ((blank (make-string 80 :initial-element #\Space)))
+      (setf (gethash "input1" context) blank
+            (gethash "input2" context) blank
+            (gethash "input1" lspf:*current-field-values*) blank
+            (gethash "input2" lspf:*current-field-values*) blank))
     (when (string= (string-trim '(#\Space) text) "")
       (return-from lspf:handle-key :stay))
     ;; Handle /help command

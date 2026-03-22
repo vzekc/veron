@@ -395,21 +395,30 @@
   "Return the scroll offset (end index into message buffer), or NIL for latest."
   (lspf:session-property lspf:*session* :chat-scroll-offset))
 
+(defun chat-preceding-timestamp (channel-id start)
+  "Return the timestamp of the message just before START index, or NIL."
+  (when (plusp start)
+    (let ((prev (user-messages-slice channel-id (1- start) start)))
+      (when prev (getf (first prev) :created-at)))))
+
 (defun chat-display-messages ()
-  "Return (values messages start-of-log-p) based on scroll position."
+  "Return (values messages start-of-log-p preceding-timestamp) based on scroll."
   (let* ((channel-id (chat-channel-id))
          (offset (chat-scroll-offset)))
     (if offset
         (let* ((start (max 0 (- offset +chat-display-lines+)))
                (at-start (zerop start)))
-          ;; Leave room for the header line at the start of the log
           (values (user-messages-slice channel-id start
                                       (if at-start
                                           (min offset (1- +chat-display-lines+))
                                           offset))
-                  at-start))
-        (values (user-messages-tail channel-id +chat-display-lines+)
-                nil))))
+                  at-start
+                  (chat-preceding-timestamp channel-id start)))
+        (let* ((total (user-message-count channel-id))
+               (start (max 0 (- total +chat-display-lines+))))
+          (values (user-messages-tail channel-id +chat-display-lines+)
+                  nil
+                  (chat-preceding-timestamp channel-id start))))))
 
 (defun current-username ()
   "Return the current session's username."
@@ -426,11 +435,13 @@
                             (list :content line :color cl3270:+turquoise+))
                           *chat-help-text*)))
         ;; Show chat messages
-        (multiple-value-bind (msgs start-of-log-p) (chat-display-messages)
+        (multiple-value-bind (msgs start-of-log-p preceding-ts)
+            (chat-display-messages)
           (let* ((scrolled (chat-scroll-offset))
                  (my-name (current-username))
                  (lines (format-chat-messages msgs my-name
-                                              :start-of-log start-of-log-p))
+                                              :start-of-log start-of-log-p
+                                              :preceding-timestamp preceding-ts))
                  (n (length lines)))
             (cond
               ;; Scrolled back: top-align

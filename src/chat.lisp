@@ -193,14 +193,16 @@ Public: (<nick>) message  Private: *nick* message"
             day month year hour min "")))
 
 (defun format-chat-messages (messages &optional current-username
-                             &key start-of-log)
+                             &key start-of-log preceding-timestamp)
   "Format a list of message plists into display lines.
 Inserts a timestamp divider after 15+ minutes of silence.
+PRECEDING-TIMESTAMP is the time of the last message before this page,
+used to detect gaps at page boundaries.
 When START-OF-LOG is true, prepends the absolute timestamp of the first message.
 When CURRENT-USERNAME is given, highlight that user's messages.
 Returns a list of strings or plists (for colored lines)."
   (let ((lines '())
-        (last-time nil))
+        (last-time preceding-timestamp))
     (when (and start-of-log messages)
       (let ((first-ts (getf (first messages) :created-at)))
         (when first-ts

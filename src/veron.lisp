@@ -399,7 +399,7 @@
   "Return messages to display based on scroll position."
   (let* ((channel-id (chat-channel-id))
          (offset (chat-scroll-offset))
-         (private-msgs (consume-private-messages)))
+         (private-msgs (collect-private-messages)))
     (if offset
         (let* ((start (max 0 (- offset +chat-display-lines+))))
           (chat-messages-slice channel-id start offset))
@@ -480,6 +480,7 @@ Treats the second line as a continuation of the first (no newline inserted)."
     ;; Regular message
     (let ((user (session-user lspf:*session*)))
       (add-chat-message (chat-channel-id) user text))
+    (clear-private-messages)
     (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil))
   :stay)
 

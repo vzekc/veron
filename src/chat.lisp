@@ -198,9 +198,17 @@ Returns a list of strings or plists (for colored lines)."
            (setf (car delivered) t)))))
     (car delivered)))
 
-(defun consume-private-messages ()
-  "Return and clear pending private messages for the current session."
-  (let ((msgs (lspf:session-property lspf:*session* :chat-inbox)))
-    (when msgs
-      (setf (lspf:session-property lspf:*session* :chat-inbox) nil))
-    msgs))
+(defun collect-private-messages ()
+  "Move any new private messages from inbox to the visible list.
+Returns the full visible private message list."
+  (let ((inbox (lspf:session-property lspf:*session* :chat-inbox)))
+    (when inbox
+      (setf (lspf:session-property lspf:*session* :chat-inbox) nil)
+      (setf (lspf:session-property lspf:*session* :chat-private-visible)
+            (nconc (or (lspf:session-property lspf:*session* :chat-private-visible) '())
+                   inbox)))
+    (lspf:session-property lspf:*session* :chat-private-visible)))
+
+(defun clear-private-messages ()
+  "Clear the visible private message list."
+  (setf (lspf:session-property lspf:*session* :chat-private-visible) nil))

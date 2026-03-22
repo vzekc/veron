@@ -433,11 +433,12 @@
               (last lines +chat-display-lines+))))))
 
 (defun parse-chat-input (input1 input2)
-  "Combine two input lines into a single message string, trimming trailing blanks."
+  "Combine two input lines into a single message string.
+Treats the second line as a continuation of the first (no newline inserted)."
   (let* ((line1 (string-right-trim '(#\Space) input1))
          (line2 (string-right-trim '(#\Space) input2)))
     (if (plusp (length line2))
-        (concatenate 'string line1 (string #\Newline) line2)
+        (concatenate 'string line1 line2)
         line1)))
 
 (defun clear-chat-input ()

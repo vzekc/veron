@@ -194,14 +194,13 @@ Returns a list of strings or plists (for colored lines)."
              (private-p (getf msg :private))
              (own-p (and current-username (not private-p)
                          (string-equal username current-username))))
-        ;; Insert silence divider if gap between public messages > 15 minutes
-        (when (and (not private-p) last-time timestamp
+        ;; Insert silence divider if gap > 15 minutes
+        (when (and last-time timestamp
                    (> (- timestamp last-time) +silence-threshold+))
           (push (list :content (format-silence-divider (- timestamp last-time))
                       :color cl3270:+turquoise+)
                 lines))
-        (when (and timestamp (not private-p))
-          (setf last-time timestamp))
+        (when timestamp (setf last-time timestamp))
         (dolist (line (wrap-message-lines username (getf msg :message)
                                           :private private-p))
           (push (cond (private-p (list :content line :color cl3270:+yellow+))

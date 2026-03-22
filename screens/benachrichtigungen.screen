@@ -1,0 +1,24 @@
+(:name "benachrichtigungen"
+ :navigable t
+ :aliases ("notify")
+ :screen "
+
+   Benachrichtigungen
+
+   Du kannst dich per Push-Nachricht ueber Ereignisse in VERON
+   informieren lassen.  Installiere dazu die ntfy-App auf deinem
+   Handy (ntfy.sh), abonniere ein Topic und trage den Namen hier
+   ein.
+
+   ntfy-Topic:
+
+      Gaestebuch
+      Anmeldung
+      Abmeldung
+"
+ :fields ((:from (8 17) :len 40 :name topic :write t :highlighting underscore)
+          (:from (10 4) :len 1 :name evt-guestbook :write t :highlighting underscore)
+          (:from (11 4) :len 1 :name evt-login :write t :highlighting underscore)
+          (:from (12 4) :len 1 :name evt-logout :write t :highlighting underscore))
+ :keys ((:pf5 "Speichern")
+        (:pf3 "Zurueck" :back t)))

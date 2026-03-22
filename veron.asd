@@ -10,5 +10,6 @@
                              (:file "db")
                              (:file "user")
                              (:file "files")
+                             (:file "notifications")
                              (:file "veron"))))
-  :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern))
+  :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern #:dexador))

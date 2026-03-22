@@ -6,5 +6,6 @@
                     (#:lspf #:lispf)
                     (#:wl #:woltlab-login)
                     (#:pomo #:postmodern)
-                    (#:editor #:lispf-editor))
+                    (#:editor #:lispf-editor)
+                    (#:dex #:dexador))
   (:export #:start))

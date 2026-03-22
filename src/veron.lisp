@@ -89,7 +89,9 @@
       (setf (session-user lspf:*session*) user)
       (ensure-db-user user)
       (setf (session-login-id lspf:*session*)
-            (record-login user :terminal-type (session-term-type lspf:*session*))))
+            (record-login user :terminal-type (session-term-type lspf:*session*)))
+      (notify :login "Anmeldung"
+              (format nil "~A hat sich angemeldet" (user-username user))))
     'main))
 
 (lspf:define-key-handler login :pf3 ()
@@ -103,7 +105,11 @@
 ;;; Logout confirmation
 
 (lspf:define-key-handler abmelden :pf5 ()
-  (record-logout (session-login-id lspf:*session*))
+  (let ((user (session-user lspf:*session*)))
+    (record-logout (session-login-id lspf:*session*))
+    (when user
+      (notify :logout "Abmeldung"
+              (format nil "~A hat sich abgemeldet" (user-username user)))))
   :logoff)
 
 ;;; About screen
@@ -274,6 +280,9 @@
         (message (lspf:session-property lspf:*session* :new-entry-message)))
     (when (and author message)
       (add-guestbook-entry author message)
+      (notify :guestbook "Neuer Gaestebucheintrag"
+              (format nil "~A: ~A" author
+                      (subseq message 0 (min 100 (length message)))))
       (setf (lspf:session-property lspf:*session* :new-entry-author) nil)
       (setf (lspf:session-property lspf:*session* :new-entry-message) nil)
       ;; Reset list offset so the new entry is visible at the top
@@ -295,6 +304,58 @@
     (disk-to-file file-id)
     (cleanup-tmp-file file-id)
     :back))
+
+;;; Notification settings screen
+
+(defun field-enabled-p (value)
+  "Return T if a checkbox field value represents 'enabled' (any non-blank char)."
+  (and value (plusp (length (string-trim '(#\Space) value)))))
+
+(defun event-checked (events event)
+  "Return \"x\" if EVENT keyword is in the EVENTS list, empty string otherwise."
+  (if (member event events) "x" ""))
+
+(lspf:define-screen-update benachrichtigungen
+    (topic evt-guestbook evt-login evt-logout)
+  (let* ((user (session-user lspf:*session*))
+         (subs (user-subscriptions (user-id user)))
+         (sub (first subs)))
+    (when sub
+      (let ((events (getf sub :events)))
+        (setf topic (getf sub :topic)
+              evt-guestbook (event-checked events :guestbook)
+              evt-login (event-checked events :login)
+              evt-logout (event-checked events :logout))))))
+
+(lspf:define-key-handler benachrichtigungen :pf5
+    (topic evt-guestbook evt-login evt-logout)
+  (let* ((user (session-user lspf:*session*))
+         (topic-name (string-trim '(#\Space) topic))
+         (events '()))
+    (when (field-enabled-p evt-guestbook)
+      (push :guestbook events))
+    (when (field-enabled-p evt-login)
+      (push :login events))
+    (when (field-enabled-p evt-logout)
+      (push :logout events))
+    ;; Delete existing subscriptions for this user
+    (dolist (sub (user-subscriptions (user-id user)))
+      (unsubscribe (getf sub :id) (user-id user)))
+    ;; Create new subscription if topic and events are set
+    (cond
+      ((and (string= topic-name "") (null events))
+       (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+             "Benachrichtigungen deaktiviert"))
+      ((string= topic-name "")
+       (lspf:application-error "Bitte ntfy-Topic eingeben"))
+      ((null events)
+       (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+             "Benachrichtigungen deaktiviert"))
+      (t
+       (subscribe (user-id user) topic-name (nreverse events))
+       (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+             "Gespeichert")))
+    :stay))
 
 ;;; Login log screen
 

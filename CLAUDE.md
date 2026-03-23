@@ -65,3 +65,5 @@ Tables: `users`, `logins`, `guestbook`, `files` (with BYTEA content and mime_typ
 ## MCP Integration
 
 The lisp-mcp tool provides `eval_swank` and `eval_host_cl` for evaluating Lisp expressions in a running image. The parameter name is `expression` (not `code`). Use `edit_lisp` for paredit-safe structural editing of Lisp source files.
+
+The tn3270 tool can be used to veron running on localhost in order to reproduce problems reported by the user.  The user "klaus" with password "klaus" is usually available, but ask the user for credentials if you have trouble logging in.

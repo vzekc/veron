@@ -645,12 +645,21 @@ STARTTLS negotiation on the plain port."
                            :key-password key-password
                            :starttls starttls))
 
+(defun maybe-start-swank ()
+  "Start a Swank server if SWANK_PORT is set in the environment."
+  (alexandria:when-let (port-string (env "SWANK_PORT" nil))
+    (let ((port (parse-integer port-string)))
+      (swank:create-server :port port :dont-close t)
+      (format t "~&;;; Swank server started on port ~D~%" port))))
+
 (defun start-from-env ()
   "Start the VERON application with parameters read from environment variables.
 Recognized variables (all optional, defaults in parentheses):
   VERON_HOST (\"0.0.0.0\"), VERON_PORT (3270),
   VERON_TLS_PORT, VERON_TLS_CERT, VERON_TLS_KEY,
-  VERON_TLS_KEY_PASSWORD, VERON_STARTTLS (\"true\")."
+  VERON_TLS_KEY_PASSWORD, VERON_STARTTLS (\"true\"),
+  SWANK_PORT (disabled) - start a Swank server on this port."
+  (maybe-start-swank)
   (let ((host (env "VERON_HOST" "0.0.0.0"))
         (port (parse-integer (env "VERON_PORT" "3270")))
         (tls-port (let ((v (env "VERON_TLS_PORT" nil)))

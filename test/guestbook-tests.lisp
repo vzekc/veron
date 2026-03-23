@@ -58,6 +58,21 @@
     (assert-screen-contains s "testuser")
     (assert-screen-contains s "Authenticated entry")))
 
+;;; Cursor placement on guestbook-new for logged-in user
+
+(define-test e2e-guestbook-new-cursor-placement ()
+  (with-veron-app (s)
+    (login s "testuser" "testpass")
+    (navigate-to s "GUESTBOOK")
+    (press-pf s 5)
+    (assert-on-screen s "GUESTBOOK-NEW")
+    ;; Author should be pre-filled
+    (assert-screen-contains s "testuser")
+    ;; Cursor should be on first message input line (row 5, col 0)
+    ;; The field attr is at row 4 col 79 (wrapping), content starts at row 5 col 0
+    (assert-cursor-at s 5 0
+                      :description "Cursor on first message field for logged-in user")))
+
 ;;; Enter key advances cursor on guestbook-new
 
 (define-test e2e-guestbook-enter-advances-cursor ()

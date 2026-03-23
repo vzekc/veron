@@ -136,9 +136,10 @@
          (screen (string-downcase
                   (string (lspf:session-current-screen session))))
          (idle (format-duration (- now (lspf:session-last-activity session))))
-         (connected (format-duration (- now (session-connect-time session)))))
-    (format nil "~3D. ~16A ~8A ~15A ~8A ~A"
-            (1+ index) username app-name screen idle connected)))
+         (connected (format-duration (- now (session-connect-time session))))
+         (tls (if (lspf:session-tls-p session) "Yes" "")))
+    (format nil "~3D. ~16A ~8A ~15A ~8A ~10A ~A"
+            (1+ index) username app-name screen idle connected tls)))
 
 (lspf:define-dynamic-area-updater who sessions ()
   (let ((now (get-universal-time))
@@ -627,8 +628,17 @@ Treats the second line as a continuation of the first (no newline inserted)."
 
 ;;; Server entry point
 
-(defun start (&key (port 3270) (host "127.0.0.1"))
-  "Start the VERON application on PORT."
+(defun start (&key (port 3270) (host "127.0.0.1")
+                    tls-port certificate-file key-file key-password (starttls t))
+  "Start the VERON application on PORT.
+When CERTIFICATE-FILE and KEY-FILE are provided, TLS is available.
+TLS-PORT enables a dedicated TLS listener. STARTTLS (default T) offers
+STARTTLS negotiation on the plain port."
   (initialize-db)
   (load-chat-from-db)
-  (lspf:start-application *veron-app* :port port :host host))
+  (lspf:start-application *veron-app* :port port :host host
+                           :tls-port tls-port
+                           :certificate-file certificate-file
+                           :key-file key-file
+                           :key-password key-password
+                           :starttls starttls))

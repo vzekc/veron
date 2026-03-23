@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: veron
+          POSTGRES_PASSWORD: veron
+          POSTGRES_DB: veron
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      VERON_DB_HOST: localhost
+      VERON_DB_PORT: "5432"
+      VERON_DB_NAME: veron
+      VERON_DB_USER: veron
+      VERON_DB_PASSWORD: veron
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install SBCL and x3270
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sbcl x3270
+
+      - name: Install Quicklisp
+        run: |
+          curl -o /tmp/quicklisp.lisp https://beta.quicklisp.org/quicklisp.lisp
+          sbcl --non-interactive \
+            --load /tmp/quicklisp.lisp \
+            --eval '(quicklisp-quickstart:install)' \
+            --eval '(ql:add-to-init-file)'
+
+      - name: Load system
+        run: |
+          sbcl --non-interactive --load "$HOME/quicklisp/setup.lisp" --eval '
+            (progn
+              (load "load.lisp")
+              (format t "~&System loaded successfully.~%"))'
+
+      - name: Run tests
+        run: |
+          sbcl --non-interactive --load "$HOME/quicklisp/setup.lisp" --eval '
+            (progn
+              (load "load.lisp")
+              (asdf:load-system :veron-test)
+              (multiple-value-bind (success pass fail)
+                  (veron-tests:run-all)
+                (format t "~&~D passed, ~D failed~%" pass fail)
+                (unless success
+                  (uiop:quit 1))))'

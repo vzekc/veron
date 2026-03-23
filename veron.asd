@@ -13,4 +13,5 @@
                              (:file "notifications")
                              (:file "chat")
                              (:file "veron"))))
-  :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern #:dexador #:ironclad))
+  :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern #:dexador #:ironclad)
+  :in-order-to ((asdf:test-op (asdf:test-op #:veron-test))))

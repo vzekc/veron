@@ -12,13 +12,7 @@
 
 (setup-registry (make-pathname :defaults *load-truename* :name nil :type nil))
 
-;;; Load VERON (includes LISPF as dependency)
-(ql:quickload :veron)
 (ql:quickload :veron-test)
 
-;;; Load all LISPF test suites
-(load (merge-pathnames "lispf/load-tests.lisp" *load-truename*))
-
-;;; Run all registered test suites (LISPF + VERON)
 (unless (lispf-test:run-all-suites)
   (uiop:quit 1))

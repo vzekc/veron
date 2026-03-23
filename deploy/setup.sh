@@ -7,7 +7,7 @@ set -euo pipefail
 
 VERON_USER=veron
 VERON_DIR=/opt/veron
-REPO_URL=git@github.com:vzekc/veron.git
+REPO_URL=https://github.com/vzekc/veron.git
 ENV_FILE=/etc/veron/env
 
 echo "=== Installing system packages ==="

@@ -200,11 +200,13 @@
   "Navigate to prev (-1) or next (+1) guestbook entry. Returns :stay."
   (let* ((index (lspf:session-property lspf:*session* :browse-index))
          (new-index (when index (+ index direction)))
-         (entries (when new-index (guestbook-entries new-index 1)))
+         (entries (when (and new-index (>= new-index 0))
+                    (guestbook-entries new-index 1)))
          (entry (first entries)))
     (when entry
-      (setf (lspf:session-property lspf:*session* :browse-entry) entry)
-      (setf (lspf:session-property lspf:*session* :browse-index) new-index)))
+      (setf (lspf:session-property lspf:*session* :browse-entry) entry
+            (lspf:session-property lspf:*session* :browse-index) new-index
+            (lspf:session-property lspf:*session* :force-redraw) t)))
   :stay)
 
 (lspf:define-key-handler guestbook-entry :pf7 ()

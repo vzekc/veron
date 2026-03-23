@@ -114,6 +114,79 @@
     (press-pf s 3)
     (assert-on-screen s "GUESTBOOK")))
 
+;;; Switching between entries with different message lengths clears old content
+
+(define-test e2e-guestbook-entry-switch-clears-screen ()
+  (with-veron-app (s)
+    ;; Create entries directly in DB: first a short one, then a long one.
+    ;; ORDER BY created_at DESC means newest first, so index 0 = long, 1 = short.
+    (veron::add-guestbook-entry "Short" "Hi")
+    (sleep 0.1)
+    (veron::add-guestbook-entry "Long"
+      (format nil "~{~A~^~%~}"
+              (loop for i from 1 to 10
+                    collect (make-string 70 :initial-element
+                                         (code-char (+ (char-code #\a) (mod i 26)))))))
+    ;; Navigate to guestbook list
+    (press-pf s 4)
+    (assert-on-screen s "GUESTBOOK")
+    ;; Select the first entry (index 0 = the long one)
+    (move-cursor s 3 5)
+    (press-enter s)
+    (assert-on-screen s "GUESTBOOK-ENTRY")
+    (assert-screen-contains s "Long")
+    ;; Verify long content is present on a later message row
+    (let ((row10 (string-right-trim '(#\Space) (screen-row s 10))))
+      (unless (plusp (length row10))
+        (error 'test-failure :description "Long entry should have content on row 10"
+               :expected "(non-blank)" :actual row10)))
+    ;; Switch to the short entry via PF8 (next = older = index 1)
+    (press-pf s 8)
+    (assert-on-screen s "GUESTBOOK-ENTRY")
+    (assert-screen-contains s "Short")
+    (assert-screen-contains s "Hi")
+    ;; Row 10 must no longer contain remnants of the long entry
+    (let ((row10 (string-right-trim '(#\Space) (screen-row s 10))))
+      (when (plusp (length row10))
+        (error 'test-failure :description "Row 10 should be blank after switching to short entry"
+               :expected "(blank)" :actual row10)))
+    ;; Row 6 (message row 1) should also be blank since "Hi" fits on row 5
+    (let ((row6 (string-right-trim '(#\Space) (screen-row s 6))))
+      (when (plusp (length row6))
+        (error 'test-failure :description "Row 6 should be blank after switching to short entry"
+               :expected "(blank)" :actual row6)))))
+
+;;; PF7 on first guestbook entry must not cause negative SQL OFFSET
+
+(define-test e2e-guestbook-pf7-first-entry ()
+  (with-veron-app (s)
+    ;; Create two entries so the guestbook list has rows
+    (press-pf s 4)
+    (assert-on-screen s "GUESTBOOK")
+    (press-pf s 5)
+    (assert-on-screen s "GUESTBOOK-NEW")
+    (type-in-field s *guestbook-new-screen* "author" "First")
+    (move-cursor s 5 1)
+    (type-text s "First entry")
+    (press-pf s 5)
+    (press-pf s 5)
+    (assert-on-screen s "GUESTBOOK")
+    (press-pf s 5)
+    (assert-on-screen s "GUESTBOOK-NEW")
+    (type-in-field s *guestbook-new-screen* "author" "Second")
+    (move-cursor s 5 1)
+    (type-text s "Second entry")
+    (press-pf s 5)
+    (press-pf s 5)
+    (assert-on-screen s "GUESTBOOK")
+    ;; Select the first entry (row 3 in the list, index 0)
+    (move-cursor s 3 5)
+    (press-enter s)
+    (assert-on-screen s "GUESTBOOK-ENTRY")
+    ;; Press PF7 at the first entry — must not error
+    (press-pf s 7)
+    (assert-on-screen s "GUESTBOOK-ENTRY")))
+
 ;;; Runner
 
 (defun run-all ()

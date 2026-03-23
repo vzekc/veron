@@ -218,12 +218,17 @@ Returns a list of strings or plists (for colored lines)."
                       :color cl3270:+turquoise+)
                 lines))
         (when timestamp (setf last-time timestamp))
-        (dolist (line (wrap-message-lines username (getf msg :message)
-                                          :private private-p))
-          (push (cond (own-p (list :content line :color cl3270:+green+))
-                      (private-p (list :content line :color cl3270:+yellow+))
-                      (t line))
-                lines))))
+        (let ((msg-lines (if (and own-p (getf msg :raw-input))
+                             ;; Outbound: render as typed
+                             (word-wrap (getf msg :raw-input) 80)
+                             ;; Normal: format with nick prefix
+                             (wrap-message-lines username (getf msg :message)
+                                                 :private private-p))))
+          (dolist (line msg-lines)
+            (push (cond (own-p (list :content line :color cl3270:+green+))
+                        (private-p (list :content line :color cl3270:+yellow+))
+                        (t (list :content line :color cl3270:+white+)))
+                  lines)))))
     (nreverse lines)))
 
 ;;; Per-user message buffer
@@ -256,11 +261,11 @@ Returns the per-user buffer."
       (setf (lspf:session-property lspf:*session* :chat-sync-index) shared-len))
     buf))
 
-(defun add-own-message (channel-id user message)
+(defun add-own-message (channel-id user message raw-input)
   "Send a message: add to shared buffer, add locally as :own, skip during sync."
   (let ((msg (add-chat-message channel-id user message)))
-    ;; Add to own buffer with :own flag
-    (let ((own-msg (list* :own t msg)))
+    ;; Add to own buffer with :own flag and raw input text
+    (let ((own-msg (list* :own t :raw-input raw-input msg)))
       (vector-push-extend own-msg (user-chat-buffer)))
     ;; Track sent IDs so sync skips these
     (push (getf msg :id)
@@ -317,11 +322,13 @@ The message is inserted into the recipient's per-user chat buffer."
            (setf (car delivered) t)))))
     (car delivered)))
 
-(defun send-own-private-message (from-user to-username message)
+(defun send-own-private-message (from-user to-username message raw-input)
   "Add a sent private message to the sender's own buffer."
+  (declare (ignore from-user))
   (let ((msg (list :username to-username
                    :message message
                    :created-at (get-universal-time)
                    :private t
-                   :own t)))
+                   :own t
+                   :raw-input raw-input)))
     (vector-push-extend msg (user-chat-buffer))))

@@ -487,12 +487,11 @@ Treats the second line as a continuation of the first (no newline inserted)."
             (unless (deliver-private-message user recipient msg)
               (lspf:application-error
                (format nil "~A ist nicht online" recipient)))
-            ;; Add to sender's own buffer
-            (send-own-private-message user recipient msg))
+            (send-own-private-message user recipient msg text))
           (return-from lspf:handle-key :stay))))
     ;; Regular message — add locally and to shared buffer
     (let ((user (session-user lspf:*session*)))
-      (add-own-message (chat-channel-id) user text))
+      (add-own-message (chat-channel-id) user text text))
     (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil))
   :stay)
 

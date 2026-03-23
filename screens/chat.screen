@@ -2,7 +2,7 @@
  :navigable t
  :screen "
 "
- :dynamic-areas ((:name messages :from (1 0) :to (17 78)))
+ :dynamic-areas ((:name messages :from (1 0) :to (17 79)))
  :fields ((:from (17 79) :len 80 :name divider :color yellow)
           (:from (18 79) :len 80 :name input1 :write t :color green :highlighting underscore)
           (:from (19 79) :len 80 :name input2 :write t :color green :highlighting underscore))

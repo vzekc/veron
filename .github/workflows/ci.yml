@@ -48,7 +48,8 @@ jobs:
           sbcl --non-interactive \
             --load /tmp/quicklisp.lisp \
             --eval '(quicklisp-quickstart:install)' \
-            --eval '(ql:add-to-init-file)'
+            --eval '(ql:add-to-init-file)' \
+            --eval '(uiop:quit)'
 
       - name: Load system
         run: |

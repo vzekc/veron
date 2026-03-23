@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN local_password VARCHAR(255)

@@ -58,7 +58,8 @@
 ;;; Message operations
 
 (defun add-chat-message (channel-id user message)
-  "Add a chat message to RAM and persist to DB."
+  "Add a chat message to the shared buffer and persist to DB.
+Returns the message plist (for local rendering by the sender)."
   (let* ((now (get-universal-time))
          (db-id (with-db
                   (pomo:query
@@ -73,27 +74,7 @@
       (let ((buf (ensure-channel-buffer channel-id)))
         (vector-push-extend msg buf))
       (setf *chat-id-counter* (max *chat-id-counter* db-id)))
-    db-id))
-
-(defun chat-message-count (channel-id)
-  "Return the number of messages in a channel."
-  (length (channel-messages channel-id)))
-
-(defun chat-messages-slice (channel-id start end)
-  "Return messages from index START to END (exclusive) as a list."
-  (let ((buf (channel-messages channel-id)))
-    (when buf
-      (let ((len (length buf)))
-        (coerce (subseq buf (max 0 (min start len))
-                        (max 0 (min end len)))
-                'list)))))
-
-(defun chat-messages-tail (channel-id count)
-  "Return the last COUNT messages as a list, oldest first."
-  (let* ((buf (channel-messages channel-id))
-         (len (length buf))
-         (start (max 0 (- len count))))
-    (coerce (subseq buf start len) 'list)))
+    msg))
 
 ;;; Message formatting
 
@@ -170,18 +151,12 @@ Returns a list of strings."
                            (setf pos end)))))))
     (nreverse lines)))
 
-(defun wrap-message-lines (username message &key private timestamp)
+(defun wrap-message-lines (username message &key private)
   "Format a chat message into display lines with word wrapping.
-Public: HH:MM (<nick>) message  Private: HH:MM *nick* message"
-  (let* ((time-str (if timestamp
-                       (multiple-value-bind (sec min hour)
-                           (decode-display-time timestamp)
-                         (declare (ignore sec))
-                         (format nil "~2,'0D:~2,'0D " hour min))
-                       ""))
-         (prefix (if private
-                     (format nil "~A*~A* " time-str username)
-                     (format nil "~A(~A) " time-str username)))
+Public: (<nick>) message  Private: *nick* message"
+  (let* ((prefix (if private
+                     (format nil "*~A* " username)
+                     (format nil "(~A) " username)))
          (prefix-len (length prefix))
          (cont-indent (make-string (min prefix-len 20) :initial-element #\Space))
          (first-width (- 80 prefix-len))
@@ -217,7 +192,11 @@ Inserts a timestamp divider after 15+ minutes of silence.
 PRECEDING-TIMESTAMP is the time of the last message before this page,
 used to detect gaps at page boundaries.
 When START-OF-LOG is true, prepends the absolute timestamp of the first message.
-When CURRENT-USERNAME is given, highlight that user's messages.
+Message colors:
+  - Timestamps/dividers: turquoise
+  - Outbound (own) messages: green
+  - Inbound private messages: yellow
+  - Inbound public messages: default
 Returns a list of strings or plists (for colored lines)."
   (let ((lines '())
         (last-time preceding-timestamp))
@@ -231,8 +210,7 @@ Returns a list of strings or plists (for colored lines)."
       (let* ((timestamp (getf msg :created-at))
              (username (getf msg :username))
              (private-p (getf msg :private))
-             (own-p (and current-username (not private-p)
-                         (string-equal username current-username))))
+             (own-p (getf msg :own)))
         ;; Insert silence divider if gap > 15 minutes
         (when (and last-time timestamp
                    (> (- timestamp last-time) +silence-threshold+))
@@ -241,20 +219,14 @@ Returns a list of strings or plists (for colored lines)."
                 lines))
         (when timestamp (setf last-time timestamp))
         (dolist (line (wrap-message-lines username (getf msg :message)
-                                          :private private-p
-                                          :timestamp timestamp))
-          (push (cond (private-p (list :content line :color cl3270:+yellow+))
-                      (own-p (list :content line :color cl3270:+white+))
+                                          :private private-p))
+          (push (cond (own-p (list :content line :color cl3270:+green+))
+                      (private-p (list :content line :color cl3270:+yellow+))
                       (t line))
                 lines))))
     (nreverse lines)))
 
 ;;; Per-user message buffer
-;;;
-;;; Each session maintains its own message buffer that merges public
-;;; messages from the shared channel buffer with private messages.
-;;; The buffer is lazily populated from the shared buffer and syncs
-;;; new public messages on each access.
 
 (defun user-chat-buffer ()
   "Return the per-user chat buffer for the current session, creating if needed."
@@ -264,16 +236,35 @@ Returns a list of strings or plists (for colored lines)."
 
 (defun sync-user-chat-buffer (channel-id)
   "Sync the per-user buffer with new public messages from the shared channel buffer.
+Skips messages marked as :own (already in the user buffer from local send).
 Returns the per-user buffer."
   (let* ((buf (user-chat-buffer))
          (synced (or (lspf:session-property lspf:*session* :chat-sync-index) 0))
          (shared (channel-messages channel-id))
-         (shared-len (length shared)))
+         (shared-len (length shared))
+         (my-name (let ((user (session-user lspf:*session*)))
+                    (when user (user-username user)))))
     (when (< synced shared-len)
       (loop for i from synced below shared-len
-            do (vector-push-extend (aref shared i) buf))
+            for msg = (aref shared i)
+            ;; Skip own messages (already in buffer from local add)
+            unless (and my-name (string-equal (getf msg :username) my-name)
+                        (lspf:session-property lspf:*session* :chat-sent-ids)
+                        (member (getf msg :id)
+                                (lspf:session-property lspf:*session* :chat-sent-ids)))
+            do (vector-push-extend msg buf))
       (setf (lspf:session-property lspf:*session* :chat-sync-index) shared-len))
     buf))
+
+(defun add-own-message (channel-id user message)
+  "Send a message: add to shared buffer, add locally as :own, skip during sync."
+  (let ((msg (add-chat-message channel-id user message)))
+    ;; Add to own buffer with :own flag
+    (let ((own-msg (list* :own t msg)))
+      (vector-push-extend own-msg (user-chat-buffer)))
+    ;; Track sent IDs so sync skips these
+    (push (getf msg :id)
+          (lspf:session-property lspf:*session* :chat-sent-ids))))
 
 (defun user-message-count (channel-id)
   "Return the number of messages in the per-user buffer."
@@ -302,7 +293,6 @@ Scans from the end since new messages typically belong near the tail."
   (let ((ts (getf msg :created-at))
         (len (length buf)))
     (vector-push-extend nil buf)
-    ;; Shift elements right until we find the insertion point
     (let ((pos (1- len)))
       (loop while (and (>= pos 0)
                        (let ((existing-ts (getf (aref buf pos) :created-at)))
@@ -313,12 +303,11 @@ Scans from the end since new messages typically belong near the tail."
 
 (defun deliver-private-message (from-user to-username message)
   "Deliver a private message to a user's session. Returns T if delivered.
-The message is inserted into the recipient's per-user chat buffer in
-chronological order."
+The message is inserted into the recipient's per-user chat buffer."
   (let ((delivered (cons nil nil)))
-    (lspf:broadcast
+    (lispf:broadcast
      (lambda ()
-       (let ((user (session-user lspf:*session*)))
+       (let ((user (session-user lispf:*session*)))
          (when (and user (string-equal (user-username user) to-username))
            (let ((msg (list :username (user-username from-user)
                             :message message
@@ -327,3 +316,12 @@ chronological order."
              (insert-message-sorted (user-chat-buffer) msg))
            (setf (car delivered) t)))))
     (car delivered)))
+
+(defun send-own-private-message (from-user to-username message)
+  "Add a sent private message to the sender's own buffer."
+  (let ((msg (list :username to-username
+                   :message message
+                   :created-at (get-universal-time)
+                   :private t
+                   :own t)))
+    (vector-push-extend msg (user-chat-buffer))))

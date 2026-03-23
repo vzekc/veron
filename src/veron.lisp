@@ -405,11 +405,8 @@
   "Format all messages in the per-user buffer into display lines.
 Returns the full list of formatted lines."
   (let* ((channel-id (chat-channel-id))
-         (msgs (coerce (sync-user-chat-buffer channel-id) 'list))
-         (my-name (current-username)))
-    (format-chat-messages msgs
-                          :current-username my-name
-                          :start-of-log t)))
+         (msgs (coerce (sync-user-chat-buffer channel-id) 'list)))
+    (format-chat-messages msgs :start-of-log t)))
 
 (defun current-username ()
   "Return the current session's username."
@@ -489,11 +486,13 @@ Treats the second line as a continuation of the first (no newline inserted)."
           (let ((user (session-user lspf:*session*)))
             (unless (deliver-private-message user recipient msg)
               (lspf:application-error
-               (format nil "~A ist nicht online" recipient))))
+               (format nil "~A ist nicht online" recipient)))
+            ;; Add to sender's own buffer
+            (send-own-private-message user recipient msg))
           (return-from lspf:handle-key :stay))))
-    ;; Regular message
+    ;; Regular message — add locally and to shared buffer
     (let ((user (session-user lspf:*session*)))
-      (add-chat-message (chat-channel-id) user text))
+      (add-own-message (chat-channel-id) user text))
     (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil))
   :stay)
 

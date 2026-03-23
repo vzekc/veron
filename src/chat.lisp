@@ -78,8 +78,8 @@ Returns the message plist (for local rendering by the sender)."
 
 ;;; Message formatting
 
-(defconstant +chat-display-lines+ 17
-  "Number of lines available for chat message display (rows 1-17).")
+(defconstant +chat-display-lines+ 18
+  "Number of lines available for chat message display (rows 0-17).")
 
 (defparameter *german-numbers*
   #("null" "eins" "zwei" "drei" "vier" "fuenf" "sechs" "sieben"

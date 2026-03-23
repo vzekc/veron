@@ -13,14 +13,12 @@ jobs:
 
     steps:
       - name: Deploy to retrostar
-        uses: appleboy/ssh-action@v1
-        with:
-          host: retrostar.classic-computing.de
-          username: veron
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: |
-            cd /opt/veron
-            git pull --recurse-submodules
-            sudo /usr/bin/systemctl restart veron
-            sleep 2
-            systemctl is-active --quiet veron && echo "VERON is running" || { echo "VERON failed to start"; exit 1; }
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=accept-new \
+              -i ~/.ssh/deploy_key \
+              veron@retrostar.classic-computing.de

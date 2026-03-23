@@ -18,4 +18,9 @@ jobs:
           host: retrostar.classic-computing.de
           username: veron
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: /opt/veron/deploy/deploy.sh
+          script: |
+            cd /opt/veron
+            git pull --recurse-submodules
+            sudo /usr/bin/systemctl restart veron
+            sleep 2
+            systemctl is-active --quiet veron && echo "VERON is running" || { echo "VERON failed to start"; exit 1; }

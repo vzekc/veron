@@ -307,8 +307,10 @@ Scans from the end since new messages typically belong near the tail."
 
 (defun deliver-private-message (from-user to-username message)
   "Deliver a private message to a user's session. Returns T if delivered.
-The message is inserted into the recipient's per-user chat buffer."
-  (let ((delivered (cons nil nil)))
+The message is inserted into the recipient's per-user chat buffer.
+Sets the PM flag in the chat indicator if the recipient is not viewing latest chat."
+  (let ((delivered (cons nil nil))
+        (chat-count (count-chat-users)))
     (lispf:broadcast
      (lambda ()
        (let ((user (session-user lispf:*session*)))
@@ -318,6 +320,10 @@ The message is inserted into the recipient's per-user chat buffer."
                             :created-at (get-universal-time)
                             :private t)))
              (insert-message-sorted (user-chat-buffer) msg))
+           (when (or (not (eq (lspf:session-current-screen lispf:*session*) 'chat))
+                     (lspf:session-property lispf:*session* :chat-scroll-offset))
+             (setf (lspf:session-property lispf:*session* :chat-pm-pending) t)
+             (lspf:set-indicator "chat" (format-chat-indicator chat-count t)))
            (setf (car delivered) t)))))
     (car delivered)))
 

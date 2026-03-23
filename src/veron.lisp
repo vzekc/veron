@@ -368,6 +368,37 @@
              "Gespeichert")))
     :stay))
 
+;;; Chat indicators
+
+(defun count-chat-users ()
+  "Count sessions currently on the chat screen."
+  (let ((count 0))
+    (bt:with-lock-held ((lspf::application-sessions-lock lspf:*application*))
+      (dolist (s (lspf::application-sessions lspf:*application*))
+        (when (and (eq (lspf:session-current-screen s) 'chat)
+                   (not (lspf:session-property s :chat-leaving)))
+          (incf count))))
+    count))
+
+(defun format-chat-indicator (user-count pm-pending)
+  "Format combined chat indicator: CHAT:xxi where xx=users, i=PM flag."
+  (format nil "CHAT:~2,'0D~A" (min user-count 99) (if pm-pending "*" " ")))
+
+(defun update-chat-indicators ()
+  "Update chat indicator on all sessions with current count and per-session PM flag."
+  (let ((count (count-chat-users)))
+    (lspf:broadcast
+     (lambda ()
+       (lspf:set-indicator "chat"
+         (format-chat-indicator count
+           (lspf:session-property lspf:*session* :chat-pm-pending)))))))
+
+(defun update-my-chat-indicator ()
+  "Update just the current session's chat indicator."
+  (lspf:set-indicator "chat"
+    (format-chat-indicator (count-chat-users)
+      (lspf:session-property lspf:*session* :chat-pm-pending))))
+
 ;;; Chat screen
 
 (defvar *chat-help-text*
@@ -387,9 +418,11 @@
 (lspf:define-screen-update chat (divider)
   (setf divider (format nil "~80,,,'-A" "--- /help "))
   (lspf:set-cursor 20 0)
+  (setf (lspf:session-property lspf:*session* :chat-leaving) nil)
   (unless (lspf:session-property lspf:*session* :chat-entered)
     (setf (lspf:session-property lspf:*session* :chat-entered) t
           (lspf:session-property lspf:*session* :chat-loading) t))
+  (update-chat-indicators)
   (let ((total (length (chat-all-formatted-lines))))
     (when (> total +chat-display-lines+)
       (lspf:show-key :pf7 "Aeltere"))
@@ -433,6 +466,10 @@ Returns the full list of formatted lines."
         (let* ((all-lines (chat-all-formatted-lines))
                (total (length all-lines))
                (offset (chat-scroll-offset)))
+          (when (and (not offset)
+                     (lspf:session-property lspf:*session* :chat-pm-pending))
+            (setf (lspf:session-property lspf:*session* :chat-pm-pending) nil)
+            (update-my-chat-indicator))
           (cond
             ;; Scrolled back: show page ending at offset
             (offset
@@ -499,6 +536,11 @@ Treats the second line as a continuation of the first (no newline inserted)."
       (add-own-message (chat-channel-id) user text text))
     (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil))
   :stay)
+
+(lspf:define-key-handler chat :pf3 ()
+  (setf (lspf:session-property lspf:*session* :chat-leaving) t)
+  (update-chat-indicators)
+  :back)
 
 (lspf:define-key-handler chat :pf1 ()
   (setf (lspf:session-property lspf:*session* :chat-show-help)

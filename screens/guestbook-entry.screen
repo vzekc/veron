@@ -1,4 +1,4 @@
-(:name "gaestebuch-eintrag"
+(:name "guestbook-entry"
  :anonymous t
  :screen "
 

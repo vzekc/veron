@@ -1,4 +1,4 @@
-(:name "gaestebuch-loeschen"
+(:name "guestbook-delete"
  :screen "
 
 

@@ -27,5 +27,5 @@
           (:from (16 18) :len 43 :intense t :color pink))
  :keys ((:enter "Login")
         (:pf3 "Trennen")
-        (:pf4 "Gaestebuch" :goto gaestebuch)
+        (:pf4 "Gaestebuch" :goto guestbook)
         (:pf6 "Ueber" :goto about)))

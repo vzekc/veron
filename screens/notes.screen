@@ -1,4 +1,4 @@
-(:name "notizen"
+(:name "notes"
  :navigable t
  :screen "
 "

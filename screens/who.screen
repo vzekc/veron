@@ -1,11 +1,10 @@
 (:name "who"
- :command t
  :navigable t
  :aliases ("wer")
  :screen "
 
-      User             App     Screen          Connected
+      User             App     Screen          Idle     Connected
 "
  :fields ()
- :dynamic-areas ((:name sessions :from (2 0) :to (18 78)))
+ :dynamic-areas ((:name sessions :from (2 0) :to (18 79)))
  :keys ((:pf3 "Zurueck" :back t)))

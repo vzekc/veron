@@ -1,4 +1,4 @@
-(:name "protokoll"
+(:name "log"
  :command t
  :navigable t
  :aliases ("log")

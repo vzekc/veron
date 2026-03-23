@@ -57,6 +57,9 @@
 (defmethod lspf:anonymous-access-denied-message ((app (eql *veron-app*)))
   "Anmeldung erforderlich")
 
+(defmethod lspf:session-idle-timeout ((app (eql *veron-app*)) session)
+  (if (session-user session) nil 60))
+
 ;;; Utility
 
 (defun format-duration (seconds)
@@ -100,11 +103,11 @@
 ;;; Main screen
 
 (lspf:define-key-handler main :pf3 ()
-  'abmelden)
+  'logout)
 
 ;;; Logout confirmation
 
-(lspf:define-key-handler abmelden :pf5 ()
+(lspf:define-key-handler logout :pf5 ()
   (let ((user (session-user lspf:*session*)))
     (record-logout (session-login-id lspf:*session*))
     (when user
@@ -130,9 +133,10 @@
                        ""))
          (screen (string-downcase
                   (string (lspf:session-current-screen session))))
+         (idle (format-duration (- now (lspf:session-last-activity session))))
          (connected (format-duration (- now (session-connect-time session)))))
-    (format nil "~3D. ~16A ~8A ~15A ~A"
-            (1+ index) username app-name screen connected)))
+    (format nil "~3D. ~16A ~8A ~15A ~8A ~A"
+            (1+ index) username app-name screen idle connected)))
 
 (lspf:define-dynamic-area-updater who sessions ()
   (let ((now (get-universal-time))
@@ -151,7 +155,7 @@
 
 ;;; Guestbook screens
 
-(lspf:define-list-data-getter gaestebuch (start end)
+(lspf:define-list-data-getter guestbook (start end)
   (let* ((total (guestbook-count))
          (entries (guestbook-entries start (- end start))))
     (values (loop for e in entries
@@ -162,7 +166,7 @@
                                                      (getf e :message))))
             total)))
 
-(lspf:define-key-handler gaestebuch :enter ()
+(lspf:define-key-handler guestbook :enter ()
   (let ((index (lspf:selected-list-index)))
     (when index
       (let* ((entries (guestbook-entries index 1))
@@ -170,9 +174,9 @@
         (when entry
           (setf (lspf:session-property lspf:*session* :browse-entry) entry)
           (setf (lspf:session-property lspf:*session* :browse-index) index)
-          'gaestebuch-eintrag)))))
+          'guestbook-entry)))))
 
-(lspf:define-screen-update gaestebuch-eintrag (author date message)
+(lspf:define-screen-update guestbook-entry (author date message)
   (let ((entry (lspf:session-property lspf:*session* :browse-entry)))
     (when entry
       (setf author (getf entry :author)
@@ -200,13 +204,13 @@
       (setf (lspf:session-property lspf:*session* :browse-index) new-index)))
   :stay)
 
-(lspf:define-key-handler gaestebuch-eintrag :pf7 ()
+(lspf:define-key-handler guestbook-entry :pf7 ()
   (browse-guestbook-entry -1))
 
-(lspf:define-key-handler gaestebuch-eintrag :pf8 ()
+(lspf:define-key-handler guestbook-entry :pf8 ()
   (browse-guestbook-entry 1))
 
-(lspf:define-key-handler gaestebuch-eintrag :pf5 ()
+(lspf:define-key-handler guestbook-entry :pf5 ()
   (let ((user (session-user lspf:*session*)))
     (unless (admin-p user)
       (lspf:application-error "Keine Berechtigung"))
@@ -214,11 +218,11 @@
       (when entry
         (setf (lspf:session-property lspf:*session* :confirm-delete)
               (getf entry :id))
-        'gaestebuch-loeschen))))
+        'guestbook-delete))))
 
 ;;; Guestbook delete confirmation
 
-(lspf:define-key-handler gaestebuch-loeschen :pf5 ()
+(lspf:define-key-handler guestbook-delete :pf5 ()
   (let ((entry-id (lspf:session-property lspf:*session* :confirm-delete)))
     (when entry-id
       (let ((index (lspf:session-property lspf:*session* :browse-index)))
@@ -233,19 +237,19 @@
              (setf (lspf:session-property lspf:*session* :browse-entry) entry)
              (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
                    "Eintrag geloescht")
-             :back)  ; back to gaestebuch-eintrag
+             :back)  ; back to guestbook-entry
             (t
              ;; No more entries, return to list
              (setf (lspf:session-property lspf:*session* :browse-entry) nil)
              (pop (lspf:session-screen-stack lspf:*session*))
-             (setf (lspf:list-offset lspf:*session* 'gaestebuch) 0)
+             (setf (lspf:list-offset lspf:*session* 'guestbook) 0)
              (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
                    "Eintrag geloescht")
              :back)))))))
 
 ;;; Guestbook new entry
 
-(lspf:define-screen-update gaestebuch-neu (author message)
+(lspf:define-screen-update guestbook-new (author message)
   (let ((user (session-user lspf:*session*)))
     (when (and user (string= author ""))
       (setf author (user-username user)))
@@ -256,7 +260,7 @@
     (when (and saved-message (string= message ""))
       (setf message saved-message))))
 
-(lspf:define-key-handler gaestebuch-neu :pf5 (author message)
+(lspf:define-key-handler guestbook-new :pf5 (author message)
   (let ((user (session-user lspf:*session*)))
     (when (string= message "")
       (lspf:application-error "Bitte Nachricht eingeben"))
@@ -267,15 +271,15 @@
                         (format nil "~A (Gast)" author)))))
       (setf (lspf:session-property lspf:*session* :new-entry-author) name)
       (setf (lspf:session-property lspf:*session* :new-entry-message) message))
-    'gaestebuch-pruefen))
+    'guestbook-confirm))
 
 ;;; Guestbook save confirmation
 
-(lspf:define-screen-update gaestebuch-pruefen (author message)
+(lspf:define-screen-update guestbook-confirm (author message)
   (setf author (lspf:session-property lspf:*session* :new-entry-author))
   (setf message (lspf:session-property lspf:*session* :new-entry-message)))
 
-(lspf:define-key-handler gaestebuch-pruefen :pf5 ()
+(lspf:define-key-handler guestbook-confirm :pf5 ()
   (let ((author (lspf:session-property lspf:*session* :new-entry-author))
         (message (lspf:session-property lspf:*session* :new-entry-message)))
     (when (and author message)
@@ -286,17 +290,17 @@
       (setf (lspf:session-property lspf:*session* :new-entry-author) nil)
       (setf (lspf:session-property lspf:*session* :new-entry-message) nil)
       ;; Reset list offset so the new entry is visible at the top
-      (setf (lspf:list-offset lspf:*session* 'gaestebuch) 0)
+      (setf (lspf:list-offset lspf:*session* 'guestbook) 0)
       ;; Set confirmation message for the guestbook list
       (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
             "Eintrag gespeichert")))
-  ;; Pop back past gaestebuch-neu to the guestbook list
+  ;; Pop back past guestbook-new to the guestbook list
   (pop (lspf:session-screen-stack lspf:*session*))
   :back)
 
 ;;; Notizen (editor demo)
 
-(lspf:define-screen-update notizen ()
+(lspf:define-screen-update notes ()
   (let* ((user (session-user lspf:*session*))
          (file-id (ensure-notes-file user))
          (path (file-to-disk file-id)))
@@ -315,7 +319,7 @@
   "Return \"x\" if EVENT keyword is in the EVENTS list, empty string otherwise."
   (if (member event events) "x" ""))
 
-(lspf:define-screen-update benachrichtigungen
+(lspf:define-screen-update notifications
     (topic evt-guestbook evt-login evt-logout)
   (let* ((user (session-user lspf:*session*))
          (subs (user-subscriptions (user-id user)))
@@ -327,7 +331,7 @@
               evt-login (event-checked events :login)
               evt-logout (event-checked events :logout))))))
 
-(lspf:define-key-handler benachrichtigungen :pf5
+(lspf:define-key-handler notifications :pf5
     (topic evt-guestbook evt-login evt-logout)
   (let* ((user (session-user lspf:*session*))
          (topic-name (string-trim '(#\Space) topic))
@@ -532,7 +536,7 @@ Treats the second line as a continuation of the first (no newline inserted)."
 
 ;;; Login log screen
 
-(lspf:define-list-data-getter protokoll (start end)
+(lspf:define-list-data-getter log (start end)
   (let* ((total (login-log-count))
          (entries (login-log-entries start (- end start))))
     (values (loop for e in entries

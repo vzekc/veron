@@ -18,6 +18,7 @@
 (ql:quickload :veron-test)
 (ql:quickload :lispf-test)
 (ql:quickload :lispf-edit)
+(ql:quickload :lispf-guestbook)
 
 ;;; Load LISPF test suites
 (let ((*default-pathname-defaults* (asdf:system-source-directory :lispf)))

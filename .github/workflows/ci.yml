@@ -42,13 +42,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y sbcl x3270
 
+      - name: Cache Quicklisp
+        uses: actions/cache@v4
+        with:
+          path: ~/quicklisp
+          key: quicklisp-${{ runner.os }}
+
       - name: Install Quicklisp
         run: |
-          curl -o /tmp/quicklisp.lisp https://beta.quicklisp.org/quicklisp.lisp
-          sbcl --non-interactive \
-            --load /tmp/quicklisp.lisp \
-            --eval '(quicklisp-quickstart:install)' \
-            --eval '(ql-util:without-prompting (ql:add-to-init-file))'
+          if [ ! -f "$HOME/quicklisp/setup.lisp" ]; then
+            curl -o /tmp/quicklisp.lisp https://beta.quicklisp.org/quicklisp.lisp
+            sbcl --non-interactive \
+              --load /tmp/quicklisp.lisp \
+              --eval '(quicklisp-quickstart:install)' \
+              --eval '(ql-util:without-prompting (ql:add-to-init-file))'
+          fi
 
       - name: Load system
         run: |

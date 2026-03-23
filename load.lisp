@@ -11,4 +11,6 @@
 
 (setup-registry (make-pathname :defaults *load-truename* :name nil :type nil))
 
-(asdf:load-system "veron")
+(if (find-package :ql)
+    (funcall (intern "QUICKLOAD" :ql) :veron)
+    (asdf:load-system "veron"))

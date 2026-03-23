@@ -12,7 +12,7 @@ EnvironmentFile=/etc/veron/env
 ExecStart=/usr/bin/sbcl --non-interactive \
     --load /home/veron/quicklisp/setup.lisp \
     --load load.lisp \
-    --eval '(veron:start :host "0.0.0.0")'
+    --eval '(veron:start-from-env)'
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

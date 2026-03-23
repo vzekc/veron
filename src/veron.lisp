@@ -642,3 +642,24 @@ STARTTLS negotiation on the plain port."
                            :key-file key-file
                            :key-password key-password
                            :starttls starttls))
+
+(defun start-from-env ()
+  "Start the VERON application with parameters read from environment variables.
+Recognized variables (all optional, defaults in parentheses):
+  VERON_HOST (\"0.0.0.0\"), VERON_PORT (3270),
+  VERON_TLS_PORT, VERON_TLS_CERT, VERON_TLS_KEY,
+  VERON_TLS_KEY_PASSWORD, VERON_STARTTLS (\"true\")."
+  (let ((host (env "VERON_HOST" "0.0.0.0"))
+        (port (parse-integer (env "VERON_PORT" "3270")))
+        (tls-port (let ((v (env "VERON_TLS_PORT" nil)))
+                    (when v (parse-integer v))))
+        (cert (env "VERON_TLS_CERT" nil))
+        (key (env "VERON_TLS_KEY" nil))
+        (key-pw (env "VERON_TLS_KEY_PASSWORD" nil))
+        (starttls (string-equal (env "VERON_STARTTLS" "true") "true")))
+    (start :host host :port port
+           :tls-port tls-port
+           :certificate-file cert
+           :key-file key
+           :key-password key-pw
+           :starttls starttls)))

@@ -8,4 +8,5 @@
                     (#:pomo #:postmodern)
                     (#:editor #:lispf-editor)
                     (#:dex #:dexador))
-  (:export #:start))
+  (:export #:start
+            #:start-from-env))

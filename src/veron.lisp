@@ -58,7 +58,9 @@
   "Anmeldung erforderlich")
 
 (defmethod lspf:session-idle-timeout ((app (eql *veron-app*)) session)
-  (if (session-user session) nil 60))
+  (case (lspf:session-current-screen session)
+    (login 60)
+    (otherwise nil)))
 
 ;;; Utility
 

@@ -251,7 +251,7 @@
 
 (lspf:define-screen-update guestbook-new (author message)
   (let ((user (session-user lspf:*session*)))
-    (when (and user (string= author ""))
+    (when (and user (or (null author) (string= author "")))
       (setf author (user-username user)))
     (when user
       (lspf:set-field-attribute "author" :write nil :intense t)))
@@ -259,6 +259,11 @@
   (let ((saved-message (lspf:session-property lspf:*session* :new-entry-message)))
     (when (and saved-message (string= message ""))
       (setf message saved-message))))
+
+(lspf:define-key-handler guestbook-new :enter ()
+  (let ((next-row (min (1+ (lspf:cursor-row)) 20)))
+    (lspf:set-cursor next-row 0))
+  :stay)
 
 (lspf:define-key-handler guestbook-new :pf5 (author message)
   (let ((user (session-user lspf:*session*)))

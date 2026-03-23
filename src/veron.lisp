@@ -457,9 +457,7 @@ Treats the second line as a continuation of the first (no newline inserted)."
   (let ((blank (make-string 80 :initial-element #\Space))
         (context (lspf:session-context lspf:*session*)))
     (setf (gethash "input1" context) blank
-          (gethash "input2" context) blank
-          (gethash "input1" lspf:*current-field-values*) blank
-          (gethash "input2" lspf:*current-field-values*) blank)))
+          (gethash "input2" context) blank)))
 
 (lspf:define-key-handler chat :enter (input1 input2)
   (when (lspf:session-property lspf:*session* :chat-show-help)

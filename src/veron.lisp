@@ -80,12 +80,14 @@
 (lspf:define-key-handler login :enter (username password)
   (when (or (string= username "") (string= password ""))
     (lspf:application-error "Bitte Benutzername und Passwort eingeben"))
-  (let ((result (wl:authenticate-user username password
-                                      :host (env "VERON_AUTH_DB_HOST")
-                                      :port (parse-integer (env "VERON_AUTH_DB_PORT"))
-                                      :database (env "VERON_AUTH_DB_NAME")
-                                      :user (env "VERON_AUTH_DB_USER")
-                                      :db-password (env "VERON_AUTH_DB_PASSWORD"))))
+  (let ((result (or (authenticate-local username password)
+                    (when (env "VERON_AUTH_DB_HOST" nil)
+                      (wl:authenticate-user username password
+                                            :host (env "VERON_AUTH_DB_HOST")
+                                            :port (parse-integer (env "VERON_AUTH_DB_PORT"))
+                                            :database (env "VERON_AUTH_DB_NAME")
+                                            :user (env "VERON_AUTH_DB_USER")
+                                            :db-password (env "VERON_AUTH_DB_PASSWORD"))))))
     (unless result
       (lspf:application-error "Ungueltiger Benutzername oder Passwort"))
     (let ((user (make-user result)))

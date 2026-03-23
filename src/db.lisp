@@ -70,6 +70,24 @@
 
 ;;; User persistence
 
+(defun hash-password (password)
+  "Return hex-encoded SHA-256 hash of PASSWORD."
+  (ironclad:byte-array-to-hex-string
+   (ironclad:digest-sequence :sha256
+                             (ironclad:ascii-string-to-byte-array password))))
+
+(defun authenticate-local (username password)
+  "Try local password authentication. Returns a plist like woltlab-login on success, NIL otherwise."
+  (with-db
+    (let ((row (pomo:query
+                "SELECT id, name, local_password FROM users WHERE name = $1 AND local_password IS NOT NULL"
+                username :row)))
+      (when (and row (string= (third row) (hash-password password)))
+        (list :user-id (first row)
+              :username (second row)
+              :email ""
+              :groups nil)))))
+
 (defun ensure-db-user (user)
   (with-db
     (pomo:execute

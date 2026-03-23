@@ -411,6 +411,8 @@
     "  /msg <Name> <Nachricht>"
     "      Private Nachricht senden (wird nicht"
     "      gespeichert, Empfaenger muss online sein)"
+    "  /who     Wer ist im Chat?"
+    "  /quit    Chat verlassen"
     ""
     "  PF7/PF8  Aeltere/neuere Nachrichten"
     "  PF3      Chat verlassen"))
@@ -419,10 +421,17 @@
   (setf divider (format nil "~80,,,'-A" "--- /help "))
   (lspf:set-cursor 20 0)
   (setf (lspf:session-property lspf:*session* :chat-leaving) nil)
-  (unless (lspf:session-property lspf:*session* :chat-entered)
-    (setf (lspf:session-property lspf:*session* :chat-entered) t
-          (lspf:session-property lspf:*session* :chat-loading) t))
-  (update-chat-indicators)
+  (let ((entering (not (lspf:session-property lspf:*session* :chat-entered))))
+    (unless (lspf:session-property lspf:*session* :chat-entered)
+      (setf (lspf:session-property lspf:*session* :chat-entered) t
+            (lspf:session-property lspf:*session* :chat-loading) t))
+    (update-chat-indicators)
+    (when entering
+      (let ((name (current-username)))
+        (when name
+          (broadcast-chat-notification
+           (format nil "--- ~A hat den Chat betreten" name)
+           lspf:*session*)))))
   (let ((total (length (chat-all-formatted-lines))))
     (when (> total +chat-display-lines+)
       (lspf:show-key :pf7 "Aeltere"))
@@ -454,38 +463,29 @@ Returns the full list of formatted lines."
     (when user (user-username user))))
 
 (lspf:define-dynamic-area-updater chat messages ()
-  (let ((help-p (lspf:session-property lspf:*session* :chat-show-help)))
-    (if help-p
-        ;; Show help text
-        (let ((n (length *chat-help-text*)))
-          (append (make-list (- +chat-display-lines+ n) :initial-element "")
-                  (mapcar (lambda (line)
-                            (list :content line :color cl3270:+turquoise+))
-                          *chat-help-text*)))
-        ;; Show chat messages
-        (let* ((all-lines (chat-all-formatted-lines))
-               (total (length all-lines))
-               (offset (chat-scroll-offset)))
-          (when (and (not offset)
-                     (lspf:session-property lspf:*session* :chat-pm-pending))
-            (setf (lspf:session-property lspf:*session* :chat-pm-pending) nil)
-            (update-my-chat-indicator))
-          (cond
-            ;; Scrolled back: show page ending at offset
-            (offset
-             (let* ((end (min offset total))
-                    (start (max 0 (- end +chat-display-lines+)))
-                    (page (subseq all-lines start end))
-                    (n (length page)))
-               (if (< n +chat-display-lines+)
-                   (append page
-                           (make-list (- +chat-display-lines+ n) :initial-element ""))
-                   page)))
-            ;; Live view: bottom-align last page
-            ((<= total +chat-display-lines+)
-             (append (make-list (- +chat-display-lines+ total) :initial-element "")
-                     all-lines))
-            (t (last all-lines +chat-display-lines+)))))))
+  (let* ((all-lines (chat-all-formatted-lines))
+         (total (length all-lines))
+         (offset (chat-scroll-offset)))
+    (when (and (not offset)
+               (lspf:session-property lspf:*session* :chat-pm-pending))
+      (setf (lspf:session-property lspf:*session* :chat-pm-pending) nil)
+      (update-my-chat-indicator))
+    (cond
+      ;; Scrolled back: show page ending at offset
+      (offset
+       (let* ((end (min offset total))
+              (start (max 0 (- end +chat-display-lines+)))
+              (page (subseq all-lines start end))
+              (n (length page)))
+         (if (< n +chat-display-lines+)
+             (append page
+                     (make-list (- +chat-display-lines+ n) :initial-element ""))
+             page)))
+      ;; Live view: bottom-align last page
+      ((<= total +chat-display-lines+)
+       (append (make-list (- +chat-display-lines+ total) :initial-element "")
+               all-lines))
+      (t (last all-lines +chat-display-lines+)))))
 
 (defun parse-chat-input (input1 input2)
   "Combine two input lines into a single message string.
@@ -504,16 +504,43 @@ Treats the second line as a continuation of the first (no newline inserted)."
           (gethash "input2" context) blank)))
 
 (lspf:define-key-handler chat :enter (input1 input2)
-  (when (lspf:session-property lspf:*session* :chat-show-help)
-    (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
   (let ((text (parse-chat-input (or input1 "") (or input2 ""))))
     (clear-chat-input)
     (when (string= (string-trim '(#\Space) text) "")
       (return-from lspf:handle-key :stay))
     ;; Handle /help command
     (when (string-equal (string-trim '(#\Space) text) "/help")
-      (setf (lspf:session-property lspf:*session* :chat-show-help) t)
+      (let ((buf (user-chat-buffer))
+            (now (get-universal-time)))
+        (dolist (line *chat-help-text*)
+          (vector-push-extend (list :message line :created-at now :notification t)
+                              buf)))
       (return-from lspf:handle-key :stay))
+    ;; Handle /who command
+    (when (string-equal (string-trim '(#\Space) text) "/who")
+      (let ((names '()))
+        (bt:with-lock-held ((lspf::application-sessions-lock lspf:*application*))
+          (dolist (s (lspf::application-sessions lspf:*application*))
+            (when (eq (lspf:session-current-screen s) 'chat)
+              (let ((user (session-user s)))
+                (when user (push (user-username user) names))))))
+        (let ((msg (list :message (format nil "--- Im Chat: ~{~A~^, ~}"
+                                          (sort names #'string-lessp))
+                         :created-at (get-universal-time)
+                         :notification t)))
+          (vector-push-extend msg (user-chat-buffer))))
+      (return-from lspf:handle-key :stay))
+    ;; Handle /quit command
+    (when (string-equal (string-trim '(#\Space) text) "/quit")
+      (let ((name (current-username)))
+        (setf (lspf:session-property lspf:*session* :chat-leaving) t
+              (lspf:session-property lspf:*session* :chat-entered) nil)
+        (update-chat-indicators)
+        (when name
+          (broadcast-chat-notification
+           (format nil "--- ~A hat den Chat verlassen" name)
+           lspf:*session*)))
+      (return-from lspf:handle-key :back))
     ;; Handle /msg command
     (when (and (>= (length text) 5)
                (string-equal (subseq text 0 4) "/msg"))
@@ -531,6 +558,15 @@ Treats the second line as a continuation of the first (no newline inserted)."
                (format nil "~A ist nicht online" recipient)))
             (send-own-private-message user recipient msg text))
           (return-from lspf:handle-key :stay))))
+    ;; Unknown / command
+    (when (and (plusp (length text)) (char= (char text 0) #\/))
+      (let* ((cmd (string-trim '(#\Space) text))
+             (end (or (position #\Space cmd) (length cmd)))
+             (msg (list :message (format nil "--- Unbekannter Befehl: ~A" (subseq cmd 0 end))
+                        :created-at (get-universal-time)
+                        :notification t)))
+        (vector-push-extend msg (user-chat-buffer)))
+      (return-from lspf:handle-key :stay))
     ;; Regular message — add locally and to shared buffer
     (let ((user (session-user lspf:*session*)))
       (add-own-message (chat-channel-id) user text text))
@@ -538,23 +574,21 @@ Treats the second line as a continuation of the first (no newline inserted)."
   :stay)
 
 (lspf:define-key-handler chat :pf3 ()
-  (setf (lspf:session-property lspf:*session* :chat-leaving) t)
-  (update-chat-indicators)
+  (let ((name (current-username)))
+    (setf (lspf:session-property lspf:*session* :chat-leaving) t
+          (lspf:session-property lspf:*session* :chat-entered) nil)
+    (update-chat-indicators)
+    (when name
+      (broadcast-chat-notification
+       (format nil "--- ~A hat den Chat verlassen" name)
+       lspf:*session*)))
   :back)
 
-(lspf:define-key-handler chat :pf1 ()
-  (setf (lspf:session-property lspf:*session* :chat-show-help)
-        (not (lspf:session-property lspf:*session* :chat-show-help)))
-  :stay)
-
 (lspf:define-key-handler chat :pf6 ()
-  (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil
-        (lspf:session-property lspf:*session* :chat-show-help) nil)
+  (setf (lspf:session-property lspf:*session* :chat-scroll-offset) nil)
   :stay)
 
 (lspf:define-key-handler chat :pf7 ()
-  (when (lspf:session-property lspf:*session* :chat-show-help)
-    (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
   (let* ((all-lines (chat-all-formatted-lines))
          (total (length all-lines))
          (offset (or (chat-scroll-offset) total))
@@ -565,8 +599,6 @@ Treats the second line as a continuation of the first (no newline inserted)."
   :stay)
 
 (lspf:define-key-handler chat :pf8 ()
-  (when (lspf:session-property lspf:*session* :chat-show-help)
-    (setf (lspf:session-property lspf:*session* :chat-show-help) nil))
   (let ((offset (chat-scroll-offset)))
     (unless offset
       (return-from lspf:handle-key :stay))

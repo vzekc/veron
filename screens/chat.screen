@@ -7,7 +7,6 @@
           (:from (18 79) :len 80 :name input1 :write t :color green :highlighting underscore)
           (:from (19 79) :len 80 :name input2 :write t :color green :highlighting underscore))
  :keys ((:enter "Senden")
-        (:pf1 "Hilfe" :hidden t)
         (:pf3 "Zurueck" :back t)
         (:pf6 "Neueste" :hidden t)
         (:pf7 "Aeltere" :hidden t)

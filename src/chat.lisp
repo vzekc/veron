@@ -217,14 +217,16 @@ Returns a list of strings or plists (for colored lines)."
                       :color cl3270:+turquoise+)
                 lines))
         (when timestamp (setf last-time timestamp))
-        (let ((msg-lines (if (and own-p (getf msg :raw-input))
-                             ;; Outbound: render as typed
-                             (word-wrap (getf msg :raw-input) 80)
-                             ;; Normal: format with nick prefix
-                             (wrap-message-lines username (getf msg :message)
-                                                 :private private-p))))
+        (let* ((notification-p (getf msg :notification))
+               (msg-lines (cond (notification-p
+                                 (word-wrap (getf msg :message) 80))
+                                ((and own-p (getf msg :raw-input))
+                                 (word-wrap (getf msg :raw-input) 80))
+                                (t (wrap-message-lines username (getf msg :message)
+                                                       :private private-p)))))
           (dolist (line msg-lines)
-            (push (cond (own-p (list :content line :color cl3270:+green+))
+            (push (cond (notification-p (list :content line :color cl3270:+turquoise+))
+                        (own-p (list :content line :color cl3270:+green+))
                         (private-p (list :content line :color cl3270:+yellow+))
                         (t (list :content line :color cl3270:+white+)))
                   lines)))))
@@ -326,6 +328,19 @@ Sets the PM flag in the chat indicator if the recipient is not viewing latest ch
              (lspf:set-indicator "chat" (format-chat-indicator chat-count t)))
            (setf (car delivered) t)))))
     (car delivered)))
+
+(defun broadcast-chat-notification (text &optional exclude-session)
+  "Insert a notification message into all chat users' per-session buffers.
+EXCLUDE-SESSION, if given, is skipped (used to suppress own enter/leave)."
+  (let ((msg (list :message text
+                   :created-at (get-universal-time)
+                   :notification t)))
+    (lispf:broadcast
+     (lambda ()
+       (when (and (eq (lspf:session-current-screen lispf:*session*) 'chat)
+                  (not (lspf:session-property lispf:*session* :chat-leaving))
+                  (not (eq lispf:*session* exclude-session)))
+         (vector-push-extend (copy-list msg) (user-chat-buffer)))))))
 
 (defun send-own-private-message (from-user to-username message raw-input)
   "Add a sent private message to the sender's own buffer."

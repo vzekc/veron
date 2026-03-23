@@ -16,6 +16,6 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: retrostar.classic-computing.de
-          username: root
+          username: veron
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: /opt/veron/deploy/deploy.sh

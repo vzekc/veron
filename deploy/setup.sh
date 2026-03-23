@@ -72,6 +72,12 @@ fi
 chown root:$VERON_USER "$ENV_FILE"
 chmod 640 "$ENV_FILE"
 
+echo "=== Granting veron user permission to restart service ==="
+cat > /etc/sudoers.d/veron << 'SUDOEOF'
+veron ALL=(root) NOPASSWD: /usr/bin/systemctl restart veron
+SUDOEOF
+chmod 440 /etc/sudoers.d/veron
+
 echo "=== Installing systemd service ==="
 cp "$VERON_DIR/deploy/veron.service" /etc/systemd/system/
 systemctl daemon-reload

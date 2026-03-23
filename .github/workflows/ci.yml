@@ -37,7 +37,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install SBCL and x3270
+      - name: Install SBCL and s3270
         run: |
           sudo apt-get update
           sudo apt-get install -y sbcl s3270
@@ -58,21 +58,8 @@ jobs:
               --eval '(ql-util:without-prompting (ql:add-to-init-file))'
           fi
 
-      - name: Load system
-        run: |
-          sbcl --non-interactive --load "$HOME/quicklisp/setup.lisp" --eval '
-            (progn
-              (load "load.lisp")
-              (format t "~&System loaded successfully.~%"))'
-
       - name: Run tests
         run: |
-          sbcl --non-interactive --load "$HOME/quicklisp/setup.lisp" --eval '
-            (progn
-              (load "load.lisp")
-              (asdf:load-system :veron-test)
-              (multiple-value-bind (success pass fail)
-                  (veron-tests:run-all)
-                (format t "~&~D passed, ~D failed~%" pass fail)
-                (unless success
-                  (uiop:quit 1))))'
+          sbcl --non-interactive \
+            --load "$HOME/quicklisp/setup.lisp" \
+            --load run-tests.lisp

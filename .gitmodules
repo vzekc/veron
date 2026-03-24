@@ -4,3 +4,9 @@
 [submodule "lispf"]
 	path = lispf
 	url = https://github.com/hanshuebner/lispf
+[submodule "mel-base"]
+	path = mel-base
+	url = git@github.com:hanshuebner/mel-base.git
+[submodule "cl-smtp"]
+	path = cl-smtp
+	url = git@github.com:hanshuebner/cl-smtp-hh.git

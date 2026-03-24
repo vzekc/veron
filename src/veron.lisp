@@ -5,6 +5,10 @@
 
 (in-package #:veron)
 
+;;; Integrate woltlab-login logging with lispf logger
+
+(setf wl:*log-function* #'lspf:log-message)
+
 ;;; Admin group configuration
 
 (let ((groups-env (uiop:getenv "VERON_ADMIN_GROUPS")))
@@ -648,10 +652,15 @@ STARTTLS negotiation on the plain port."
                            :starttls starttls))
 
 (defun maybe-start-swank ()
-  "Start a Swank server if SWANK_PORT is set in the environment."
+  "Start a Swank server if SWANK_PORT is set in the environment.
+Overrides quit-lisp so that ,q in SLIME closes the connection
+instead of killing the server process."
   (alexandria:when-let (port-string (env "SWANK_PORT" nil))
     (let ((port (parse-integer port-string)))
       (swank:create-server :port port :dont-close t)
+      (defun swank/backend:quit-lisp ()
+        (swank:stop-server port)
+        (swank:create-server :port port :dont-close t))
       (format t "~&;;; Swank server started on port ~D~%" port))))
 
 (defun start-from-env ()

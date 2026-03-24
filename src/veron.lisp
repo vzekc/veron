@@ -657,7 +657,8 @@ Overrides quit-lisp so that ,q in SLIME closes the connection
 instead of killing the server process."
   (alexandria:when-let (port-string (env "SWANK_PORT" nil))
     (let ((port (parse-integer port-string)))
-      (swank:create-server :port port :dont-close t)
+      (handler-bind ((style-warning #'muffle-warning))
+        (swank:create-server :port port :dont-close t))
       (setf (fdefinition (find-symbol "QUIT-LISP" :swank/backend))
             (lambda ()
               (let ((restart (find-restart (find-symbol "CLOSE-CONNECTION" :swank))))

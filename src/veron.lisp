@@ -265,7 +265,7 @@
 
 (lspf:define-screen-update guestbook-new (author message)
   (let ((user (session-user lspf:*session*)))
-    (when (and user (or (null author) (string= author "")))
+    (when user
       (setf author (user-username user)))
     (when user
       (lspf:set-field-attribute "author" :write nil :intense t)))

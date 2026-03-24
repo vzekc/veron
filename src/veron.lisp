@@ -28,6 +28,7 @@
 ;;; Application definition
 
 (lspf:define-application *veron-app*
+  :name "veron"
   :title "VERON"
   :entry-screen login
   :screen-directory (merge-pathnames

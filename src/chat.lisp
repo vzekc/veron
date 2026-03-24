@@ -171,7 +171,7 @@ Public: (<nick>) message  Private: *nick* message"
             (push (concatenate 'string cont-indent sub) lines))))
     (nreverse lines)))
 
-(defconstant +silence-threshold+ (* 15 60)
+(defconstant +silence-threshold+ (* 5 60)
   "Seconds of silence before inserting a timestamp divider.")
 
 (defun format-absolute-timestamp (universal-time)
@@ -187,7 +187,7 @@ Public: (<nick>) message  Private: *nick* message"
 
 (defun format-chat-messages (messages &key start-of-log preceding-timestamp)
   "Format a list of message plists into display lines.
-Inserts a timestamp divider after 15+ minutes of silence.
+Inserts a timestamp divider after 5+ minutes of silence.
 PRECEDING-TIMESTAMP is the time of the last message before this page,
 used to detect gaps at page boundaries.
 When START-OF-LOG is true, prepends the absolute timestamp of the first message.
@@ -210,7 +210,7 @@ Returns a list of strings or plists (for colored lines)."
              (username (getf msg :username))
              (private-p (getf msg :private))
              (own-p (getf msg :own)))
-        ;; Insert silence divider if gap > 15 minutes
+        ;; Insert silence divider if gap > 5 minutes
         (when (and last-time timestamp
                    (> (- timestamp last-time) +silence-threshold+))
           (push (list :content (format-silence-divider timestamp (- timestamp last-time))

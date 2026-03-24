@@ -80,11 +80,9 @@
 
 ;;; Login screen
 
-(lspf:define-screen-update login ()
-  (when (and lspf:*device-info* (string= "" (session-term-type lspf:*session*)))
-    (setf (session-term-type lspf:*session*) (cl3270::term-type lspf:*device-info*))))
-
 (lspf:define-screen-update login (password)
+  (when (and lspf:*device-info* (string= "" (session-term-type lspf:*session*)))
+    (setf (session-term-type lspf:*session*) (cl3270::term-type lspf:*device-info*)))
   (setf password ""))
 
 (lspf:define-key-handler login :enter (username password)

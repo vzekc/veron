@@ -23,6 +23,12 @@
     (with-veron-app (s :username "longpwuser" :password password)
       (login s "longpwuser" password))))
 
+;;; Password with spaces
+
+(define-test e2e-login-password-with-spaces ()
+  (with-veron-app (s :username "spaceuser" :password "pass word 123")
+    (login s "spaceuser" "pass word 123")))
+
 ;;; Password field cleared after failed login attempt
 ;;; A long wrong password followed by a shorter correct password must work.
 ;;; Without clearing, remnants of the long password would corrupt the short one.

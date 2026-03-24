@@ -659,8 +659,8 @@ instead of killing the server process."
     (let ((port (parse-integer port-string)))
       (swank:create-server :port port :dont-close t)
       (defun swank/backend:quit-lisp ()
-        (swank:stop-server port)
-        (swank:create-server :port port :dont-close t))
+        (when swank::*emacs-connection*
+          (swank::close-connection swank::*emacs-connection* nil nil)))
       (format t "~&;;; Swank server started on port ~D~%" port))))
 
 (defun start-from-env ()

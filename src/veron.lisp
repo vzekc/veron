@@ -84,6 +84,9 @@
   (when (and lspf:*device-info* (string= "" (session-term-type lspf:*session*)))
     (setf (session-term-type lspf:*session*) (cl3270::term-type lspf:*device-info*))))
 
+(lspf:define-screen-update login (password)
+  (setf password ""))
+
 (lspf:define-key-handler login :enter (username password)
   (when (or (string= username "") (string= password ""))
     (lspf:application-error "Bitte Benutzername und Passwort eingeben"))

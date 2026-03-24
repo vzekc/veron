@@ -104,7 +104,8 @@
       (setf (session-login-id lspf:*session*)
             (record-login user :terminal-type (session-term-type lspf:*session*)))
       (notify :login "Anmeldung"
-              (format nil "~A hat sich angemeldet" (user-username user))))
+              (format nil "~A hat sich angemeldet" (user-username user)))
+      (update-my-chat-indicator))
     'main))
 
 (lspf:define-key-handler login :pf3 ()

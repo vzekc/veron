@@ -658,9 +658,10 @@ instead of killing the server process."
   (alexandria:when-let (port-string (env "SWANK_PORT" nil))
     (let ((port (parse-integer port-string)))
       (swank:create-server :port port :dont-close t)
-      (defun swank/backend:quit-lisp ()
-        (let ((restart (find-restart (find-symbol "CLOSE-CONNECTION" :swank))))
-          (when restart (invoke-restart restart))))
+      (setf (fdefinition (find-symbol "QUIT-LISP" :swank/backend))
+            (lambda ()
+              (let ((restart (find-restart (find-symbol "CLOSE-CONNECTION" :swank))))
+                (when restart (invoke-restart restart)))))
       (format t "~&;;; Swank server started on port ~D~%" port))))
 
 (defun start-from-env ()

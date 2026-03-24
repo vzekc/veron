@@ -15,3 +15,10 @@
 (define-test e2e-login-password-with-specials ()
   (with-veron-app (s :username "specuser" :password "a!b@c#d$e%f")
     (login s "specuser" "a!b@c#d$e%f")))
+
+;;; Long password (40 characters)
+
+(define-test e2e-login-long-password ()
+  (let ((password "abcdefghijklmnopqrstuvwxyz01234567890ABC"))
+    (with-veron-app (s :username "longpwuser" :password password)
+      (login s "longpwuser" password))))

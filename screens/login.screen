@@ -23,7 +23,7 @@
    Password:
 "
  :fields ((:from (18 12) :len 21 :name username :write t)
-          (:from (19 12) :len 21 :name password :write t :hidden t :transient t)
+          (:from (19 12) :len 64 :name password :write t :hidden t :transient t)
           (:from (16 18) :len 43 :intense t :color pink))
  :keys ((:enter "Login")
         (:pf3 "Trennen")

@@ -62,6 +62,16 @@ Tables: `users`, `logins`, `guestbook`, `files` (with BYTEA content and mime_typ
 - **when-let** (from alexandria) for bind-and-test patterns
 - **Top-level form separation**: Top level forms and comment blocks are separated by empty lines
 
+## CI and Testing
+
+**Verifying before push:** Run `scripts/test-committed.sh` to test the committed state in an isolated git worktree. This reproduces exactly what CI sees — no uncommitted files, no stale ASDF cache. Always do this before pushing, especially after cross-submodule changes.
+
+**Submodule changes must be atomic:** When modifying code in a submodule (lispf, woltlab-login) that the parent repo depends on, commit and push the submodule first, then update the submodule pointer in veron and push. Never commit parent code that references symbols/functions only present in uncommitted submodule changes.
+
+**Do not trust eval_swank for CI validation:** The running Lisp image has stale definitions from previous loads. Code that works via eval_swank may fail on a clean build if files aren't committed or load order is wrong.
+
+**ASDF picks up untracked files:** If an uncommitted `.asd` file or source file exists locally, ASDF will find and load it. CI won't have it. The worktree test script catches this.
+
 ## MCP Integration
 
 The lisp-mcp tool provides `eval_swank` and `eval_host_cl` for evaluating Lisp expressions in a running image. The parameter name is `expression` (not `code`). Use `edit_lisp` for paredit-safe structural editing of Lisp source files.

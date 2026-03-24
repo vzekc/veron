@@ -5,6 +5,7 @@
   :components ((:module "test"
                 :components ((:file "packages")
                              (:file "harness")
+                             (:file "login-tests")
                              (:file "guestbook-tests"))))
   :depends-on (#:veron #:lispf/tests)
   :perform (asdf:test-op (op c)

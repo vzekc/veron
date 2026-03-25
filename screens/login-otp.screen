@@ -5,9 +5,9 @@
  :screen "
 
    Benutzername:
-   Passwort:
+   Einmalpasswort:
 "
- :fields ((:from (18 17) :len 21 :name username)
-          (:from (19 17) :len 6 :name otp-code :write t :hidden t :transient t))
+ :fields ((:from (18 19) :len 21 :name username)
+          (:from (19 19) :len 10 :name otp-code :write t :hidden t :transient t))
  :keys ((:enter "Login")
         (:pf3 "Zurueck")))

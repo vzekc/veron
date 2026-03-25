@@ -76,22 +76,26 @@
 ;;; OTP phase management
 
 (defun prepare-otp-login (username)
-  "Look up email, generate OTP, send email. Store state on session.
+  "Look up email, generate OTP if needed, send email. Store state on session.
+Reuses an active OTP from the database if one exists.
 Returns the masked email string. Signals application-error on failure."
   (let ((email (lookup-woltlab-email username)))
     (unless email
       (lspf:application-error "Benutzer nicht gefunden"))
     (when (string= email "")
       (lspf:application-error "Keine E-Mail-Adresse hinterlegt"))
-    (let ((code (generate-otp))
-          (session lspf:*session*))
-      (setf (session-otp-code session) code
-            (session-otp-expires session) (+ (get-universal-time) 300)
-            (session-otp-username session) username
-            (session-otp-email-masked session) (mask-email email)
-            (session-otp-attempts session) 0)
-      (send-otp-email email username code)
-      (mask-email email))))
+    (multiple-value-bind (existing minutes-ago) (get-active-otp username)
+      (let ((session lspf:*session*))
+        (setf (session-otp-username session) username
+              (session-otp-email-masked session) (mask-email email)
+              (session-otp-attempts session) 0)
+        (if existing
+            (setf (lspf:session-property session :otp-minutes-ago) minutes-ago)
+            (let ((code (generate-otp)))
+              (setf (lspf:session-property session :otp-minutes-ago) nil)
+              (store-otp username code 300)
+              (send-otp-email email username code)))))
+    (mask-email email)))
 
 ;;; OTP verification
 
@@ -103,25 +107,24 @@ Returns the screen to navigate to on success. Signals application-error on failu
       (lspf:application-error "Bitte Einmalpasswort eingeben"))
     (unless (string= username (session-otp-username session))
       (lspf:application-error "Benutzername stimmt nicht ueberein"))
-    (when (or (null (session-otp-expires session))
-              (> (get-universal-time) (session-otp-expires session)))
-      (lspf:application-error "Einmalpasswort abgelaufen"))
-    (incf (session-otp-attempts session))
-    (when (> (session-otp-attempts session) 3)
-      (setf (session-otp-code session) nil)
-      (lspf:application-error "Zu viele Fehlversuche"))
-    (unless (string= code (session-otp-code session))
-      (lspf:application-error
-       (format nil "Ungueltiges Einmalpasswort (~D Versuche verbleibend)"
-               (- 3 (session-otp-attempts session)))))
+    (let ((stored-code (get-active-otp username)))
+      (unless stored-code
+        (lspf:application-error "Einmalpasswort abgelaufen"))
+      (incf (session-otp-attempts session))
+      (when (> (session-otp-attempts session) 3)
+        (clear-otp username)
+        (lspf:application-error "Zu viele Fehlversuche"))
+      (unless (string= code stored-code)
+        (lspf:application-error
+         (format nil "Ungueltiges Einmalpasswort (~D Versuche verbleibend)"
+                 (- 3 (session-otp-attempts session))))))
     ;; Code valid, consume it
-    (setf (session-otp-code session) nil)
+    (clear-otp username)
     (let ((result (lookup-woltlab-user username)))
       (unless result
         (lspf:application-error "Benutzer nicht gefunden"))
       (complete-login result)
-      (setf (session-force-set-password session) t)
-      'set-password)))
+      'set-password-otp)))
 
 ;;; Local password login
 

@@ -100,6 +100,31 @@
     (pomo:execute "UPDATE users SET local_password = $1 WHERE id = $2"
                   (hash-password password) user-id)))
 
+(defun store-otp (username code seconds)
+  "Store an OTP code for USERNAME, valid for SECONDS from now."
+  (with-db
+    (pomo:execute
+     "UPDATE users SET otp_code = $1, otp_expires = CURRENT_TIMESTAMP + make_interval(secs => $2) WHERE name = $3"
+     code (coerce seconds 'double-float) username)))
+
+(defun get-active-otp (username)
+  "Return (VALUES code minutes-ago) for USERNAME's active OTP, or NIL if expired/absent.
+MINUTES-AGO is how many minutes since the OTP was sent (based on 5min expiry window)."
+  (with-db
+    (let ((row (pomo:query
+                "SELECT otp_code, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - (otp_expires - INTERVAL '5 minutes')))::integer
+                 FROM users WHERE name = $1 AND otp_expires > CURRENT_TIMESTAMP"
+                username :row)))
+      (when (and row (not (db-null-p (first row))))
+        (values (first row)
+                (max 0 (floor (second row) 60)))))))
+
+(defun clear-otp (username)
+  "Remove the OTP code for USERNAME."
+  (with-db
+    (pomo:execute "UPDATE users SET otp_code = NULL, otp_expires = NULL WHERE name = $1"
+                  username)))
+
 (defun ensure-db-user (user)
   (with-db
     (pomo:execute

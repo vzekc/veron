@@ -24,12 +24,9 @@
    (term-type :initform "" :accessor session-term-type)
    (connect-time :initform (get-universal-time) :reader session-connect-time)
    (login-id :initform nil :accessor session-login-id)
-   (otp-code :initform nil :accessor session-otp-code)
-   (otp-expires :initform nil :accessor session-otp-expires)
    (otp-username :initform nil :accessor session-otp-username)
    (otp-email-masked :initform nil :accessor session-otp-email-masked)
-   (otp-attempts :initform 0 :accessor session-otp-attempts)
-   (force-set-password :initform nil :accessor session-force-set-password)))
+   (otp-attempts :initform 0 :accessor session-otp-attempts)))
 
 ;;; Application definition
 
@@ -110,7 +107,7 @@
     (cond
       ;; TLS: cursor on username row → move to password field
       ((and tls-p (<= (lspf:cursor-row) 19) (string= password ""))
-       (lspf:set-cursor 20 18)
+       (lspf:set-cursor 20 20)
        :stay)
       ;; TLS: standard WoltLab login
       (tls-p
@@ -155,16 +152,28 @@
 (lspf:define-key-handler login-local :pf3 ()
   'login)
 
+(lspf:define-key-handler login-local :pf5 ()
+  (let ((username (session-otp-username lspf:*session*)))
+    (unless (lookup-woltlab-email username)
+      (lspf:application-error "Passwort-Reset nicht moeglich"))
+    (prepare-otp-login username)
+    'login-otp))
+
 ;;; Login with OTP screen
 
 (lspf:define-screen-update login-otp (username otp-code)
   (let ((session lspf:*session*))
     (setf username (or (session-otp-username session) "")
           otp-code "")
-    (lspf:set-field-attribute "errormsg" :color cl3270:+yellow+)
-    (setf (gethash "errormsg" (lspf:session-context session))
-          (format nil "Einmalpasswort gesendet an: ~A"
-                  (or (session-otp-email-masked session) "")))))
+    (when (not (gethash "errormsg" (lspf:session-context session)))
+      (lspf:set-field-attribute "errormsg" :color cl3270:+yellow+)
+      (let ((minutes-ago (lspf:session-property session :otp-minutes-ago))
+            (email (or (session-otp-email-masked session) "")))
+        (setf (gethash "errormsg" (lspf:session-context session))
+              (if minutes-ago
+                  (format nil "Einmalpasswort gesendet vor ~D Min. an: ~A"
+                          minutes-ago email)
+                  (format nil "Einmalpasswort gesendet an: ~A" email)))))))
 
 (lspf:define-key-handler login-otp :enter (otp-code)
   (verify-otp (session-otp-username lspf:*session*) otp-code))
@@ -172,23 +181,21 @@
 (lspf:define-key-handler login-otp :pf3 ()
   'login)
 
-;;; Set password screen
+;;; Set password after OTP login (overlay)
 
-(lspf:define-screen-update set-password (new-password confirm-password)
+(lspf:define-screen-update set-password-otp (new-password confirm-password)
   (let ((saved (lspf:session-property lspf:*session* :saved-password)))
     (setf new-password (or saved "")
           confirm-password ""))
-  (when (session-force-set-password lspf:*session*)
-    (lspf:show-key :pf3 "Abmelden")
-    (when (not (gethash "errormsg" (lspf:session-context lspf:*session*)))
-      (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
-            "Bitte lokales Passwort setzen"))))
+  (when (not (gethash "errormsg" (lspf:session-context lspf:*session*)))
+    (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+          "Bitte lokales Passwort setzen")))
 
-(lspf:define-key-handler set-password :enter (new-password confirm-password)
-  (if (and (<= (lspf:cursor-row) 8) (string= confirm-password ""))
+(lspf:define-key-handler set-password-otp :enter (new-password confirm-password)
+  (if (and (<= (lspf:cursor-row) 19) (string= confirm-password ""))
       (progn
         (setf (lspf:session-property lspf:*session* :saved-password) new-password)
-        (lspf:set-cursor 9 20)
+        (lspf:set-cursor 20 20)
         :stay)
       (progn
         (setf (lspf:session-property lspf:*session* :saved-password) nil)
@@ -200,15 +207,59 @@
           (lspf:application-error "Passwoerter stimmen nicht ueberein"))
         (let ((user (session-user lspf:*session*)))
           (save-local-password (user-id user) new-password)
-          (setf (session-force-set-password lspf:*session*) nil)
           (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
                 "Passwort gespeichert"))
         'main)))
 
+(lspf:define-key-handler set-password-otp :pf3 ()
+  'goodbye)
+
+;;; Change password from menu
+
+(lspf:define-screen-update set-password (old-password new-password confirm-password)
+  (setf old-password ""
+        new-password ""
+        confirm-password ""))
+
+(lspf:define-key-handler set-password :enter (old-password new-password confirm-password)
+  (cond
+    ;; Cursor on old-password row → move to new-password
+    ((and (<= (lspf:cursor-row) 7) (string= new-password ""))
+     (lspf:set-cursor 9 20)
+     :stay)
+    ;; Cursor on new-password row → move to confirm-password
+    ((and (<= (lspf:cursor-row) 9) (string= confirm-password ""))
+     (lspf:set-cursor 10 20)
+     :stay)
+    ;; Submit
+    (t
+     (when (string= old-password "")
+       (lspf:application-error "Bitte altes Passwort eingeben"))
+     (let* ((user (session-user lspf:*session*))
+            (username (user-username user)))
+       (unless (or (authenticate-local username old-password)
+                   (when (env "VERON_AUTH_DB_HOST" nil)
+                     (wl:authenticate-user username old-password
+                                           :host (env "VERON_AUTH_DB_HOST")
+                                           :port (parse-integer (env "VERON_AUTH_DB_PORT"))
+                                           :database (env "VERON_AUTH_DB_NAME")
+                                           :user (env "VERON_AUTH_DB_USER")
+                                           :db-password (env "VERON_AUTH_DB_PASSWORD"))))
+         (lspf:application-error "Altes Passwort ist falsch")))
+     (when (string= new-password "")
+       (lspf:application-error "Bitte neues Passwort eingeben"))
+     (when (< (length new-password) 6)
+       (lspf:application-error "Passwort muss mindestens 6 Zeichen lang sein"))
+     (unless (string= new-password confirm-password)
+       (lspf:application-error "Passwoerter stimmen nicht ueberein"))
+     (let ((user (session-user lspf:*session*)))
+       (save-local-password (user-id user) new-password)
+       (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+             "Passwort gespeichert"))
+     'main)))
+
 (lspf:define-key-handler set-password :pf3 ()
-  (if (session-force-set-password lspf:*session*)
-      'goodbye
-      :back))
+  :back)
 
 ;;; Main screen
 
@@ -234,6 +285,7 @@
     (login 60)
     (login-local 60)
     (login-otp 300)
+    (set-password-otp 300)
     (goodbye 5)
     (otherwise nil)))
 

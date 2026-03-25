@@ -7,4 +7,4 @@
          (:key "5" :label "Editor" :description "LISPF Editor Demo" :screen notes)
          (:key "6" :label "Meldungen" :description "Push-Benachrichtigungen" :screen notifications)
          (:key "7" :label "Ueber" :description "Ueber VERON und den V.z.E.k.C." :screen about)
-         (:key "8" :label "Passwort" :description "Lokales Passwort setzen" :screen set-password)))
+         (:key "8" :label "Passwort" :description "Lokales Passwort aendern" :screen set-password)))

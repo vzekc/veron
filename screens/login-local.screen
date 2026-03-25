@@ -7,7 +7,8 @@
    Benutzername:
    Passwort:
 "
- :fields ((:from (18 17) :len 21 :name username)
-          (:from (19 17) :len 62 :name password :write t :hidden t :transient t))
+ :fields ((:from (18 19) :len 21 :name username)
+          (:from (19 19) :len 60 :name password :write t :hidden t :transient t))
  :keys ((:enter "Login")
-        (:pf3 "Zurueck")))
+        (:pf3 "Zurueck")
+        (:pf5 "Passwort vergessen")))

@@ -4,7 +4,7 @@
 
 (in-package #:veron)
 
-(defconstant +changelog-display-lines+ 18
+(defconstant +changelog-display-lines+ 20
   "Number of visible content lines in the changelog dynamic area.")
 
 ;;; Changelog text splitting
@@ -46,7 +46,7 @@
     (when (< (+ offset +changelog-display-lines+) total)
       (lspf:show-key :pf8 "Naech."))
     (when (and user (admin-p user))
-      (lspf:show-key :pf5 "Bearbeiten"))))
+      (lspf:show-key :pf5 "Neu"))))
 
 ;;; Dynamic area updater
 
@@ -96,14 +96,27 @@
         (setf (lspf:session-property lspf:*session* :changelog-offset) 0)
         :back)))
 
+(defun format-manual-changelog-heading (username)
+  "Format a changelog heading for a manual entry by USERNAME with three empty lines."
+  (with-output-to-string (s)
+    (multiple-value-bind (sec min hour day month year)
+        (decode-display-time (get-universal-time))
+      (declare (ignore sec))
+      (format s "=== ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D (~A) ===~%"
+              day month year hour min username))
+    (dotimes (i 3) (terpri s))))
+
 (lspf:define-key-handler changelog :pf5 ()
   (let ((user (session-user lspf:*session*)))
     (unless (admin-p user)
       (lspf:application-error "Keine Berechtigung"))
     (let* ((file-id (ensure-changelog-file))
-           (path (file-to-disk file-id)))
-      (editor:edit-file path :display-name "Changelog")
-      (disk-to-file file-id)
-      (cleanup-tmp-file file-id)
+           (heading (format-manual-changelog-heading (user-username user)))
+           (existing (load-changelog-text)))
+      (save-changelog-text (concatenate 'string heading existing))
+      (let ((path (file-to-disk file-id)))
+        (editor:edit-file path :display-name "Changelog")
+        (disk-to-file file-id)
+        (cleanup-tmp-file file-id))
       (setf (lspf:session-property lspf:*session* :changelog-offset) 0)))
   :stay)

@@ -44,22 +44,19 @@
 ;;; Email sending
 
 (defun send-otp-email (email username code)
-  "Send the OTP code via email in a background thread."
+  "Send the OTP code via email. Signals application-error on failure."
   (let ((smtp-host (env "VERON_SMTP_HOST" nil)))
     (unless smtp-host
-      (lspf:log-message :warn "SMTP not configured, cannot send OTP email to ~A" email)
-      (return-from send-otp-email nil))
+      (lspf:application-error "E-Mail-Versand nicht konfiguriert"))
     (let ((from (env "VERON_SMTP_FROM"))
           (port (parse-integer (env "VERON_SMTP_PORT" "587")))
           (smtp-user (env "VERON_SMTP_USER" nil))
           (smtp-password (env "VERON_SMTP_PASSWORD" nil)))
-      (bt:make-thread
-       (lambda ()
-         (handler-case
-             (cl-smtp:send-email
-              smtp-host from email
-              "VERON Einmalpasswort"
-              (format nil "Hallo ~A,~%~%~
+      (handler-case
+          (cl-smtp:send-email
+           smtp-host from email
+           (format nil "VERON Einmalpasswort: ~A" code)
+           (format nil "Hallo ~A,~%~%~
                Dein Einmalpasswort fuer VERON ist: ~A~%~%~
                Das Passwort ist 5 Minuten gueltig.~%~%~
                Da Deine Verbindung nicht verschluesselt ist, kannst Du Dich ~
@@ -67,14 +64,14 @@
                mit dem Einmalpasswort wirst Du aufgefordert, ein lokales ~
                Passwort zu setzen. Bitte verwende ein Passwort, das Du ~
                nirgendwo anders benutzt.~%"
-                      username code)
-              :port port
-              :ssl :starttls
-              :authentication (when smtp-user
-                                (list smtp-user smtp-password)))
-           (error (e)
-             (lspf:log-message :error "Failed to send OTP email to ~A: ~A" email e))))
-       :name "veron-otp-email"))))
+                  username code)
+           :port port
+           :ssl (when (env "VERON_SMTP_TLS" nil) :starttls)
+           :authentication (when smtp-user
+                             (list smtp-user smtp-password)))
+        (error (e)
+          (lspf:log-message :error "Failed to send OTP email to ~A: ~A" email e)
+          (lspf:application-error "E-Mail konnte nicht gesendet werden"))))))
 
 ;;; OTP phase management
 
@@ -86,8 +83,6 @@ Returns the masked email string. Signals application-error on failure."
       (lspf:application-error "Benutzer nicht gefunden"))
     (when (string= email "")
       (lspf:application-error "Keine E-Mail-Adresse hinterlegt"))
-    (unless (env "VERON_SMTP_HOST" nil)
-      (lspf:application-error "E-Mail-Versand nicht konfiguriert"))
     (let ((code (generate-otp))
           (session lspf:*session*))
       (setf (session-otp-code session) code

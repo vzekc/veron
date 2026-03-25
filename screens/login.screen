@@ -19,12 +19,12 @@
 
                    V.z.E.k.C. Electronic Retro Online Network
 
-   Username:
+   Benutzername:
 
 "
- :fields ((:from (18 12) :len 21 :name username :write t)
-          (:from (19 3) :len 9 :name password-label)
-          (:from (19 12) :len 64 :name password :write t :hidden t :transient t)
+ :fields ((:from (18 17) :len 21 :name username :write t)
+          (:from (19 3) :len 13 :name password-label)
+          (:from (19 17) :len 62 :name password :write t :hidden t :transient t)
           (:from (16 18) :len 43 :intense t :color pink))
  :keys ((:enter "Login")
         (:pf3 "Trennen")

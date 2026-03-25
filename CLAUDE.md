@@ -39,6 +39,8 @@ Environment variables must be set (or present in `.env`): `VERON_DB_HOST`, `VERO
 
 Screen definitions use s-expression format (`.screen` and `.menu` files). The UI is in German.
 
+**Screen row numbering:** The `:screen` string starts with a newline after the opening `"`. The framework adds a header row (screen name, title, timestamp) at physical row 0 and renders the screen content starting at physical row 1. Field `:from` coordinates are relative to the screen content (row 0 = first line after the opening newline of the `:screen` string). Count rows carefully — the leading newline after `"` is consumed, so the first visible line of text is row 0 in the content but row 1 on the physical display.
+
 ### Database
 
 PostgreSQL with sequential migrations in `migrations/`. The migration runner in `db.lisp` tracks applied versions in a `schema_migrations` table.

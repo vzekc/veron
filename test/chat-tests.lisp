@@ -195,3 +195,72 @@
       (press-enter s1)
       (assert-screen-contains s1 "bob hat den Chat verlassen"
                               :description "Alice should see Bob's leave"))))
+
+;;; Verify that chat messages with special characters (inserted via SQL)
+;;; display correctly on the 3270 screen.
+
+(defun insert-special-char-messages (channel-id)
+  "Insert chat messages containing special characters via SQL."
+  (flet ((insert-msg (message)
+           (pomo:execute
+            "INSERT INTO chat_messages (channel_id, user_id, username, message, message_type)
+             VALUES ($1, 99999, 'chatuser', $2, 'message')"
+            channel-id message)))
+    (veron::with-db
+      ;; German umlauts (in CP37)
+      (insert-msg (format nil "Gr~C~Ce mit ~C~C und ~C~C"
+                          #\LATIN_SMALL_LETTER_U_WITH_DIAERESIS
+                          #\LATIN_SMALL_LETTER_SHARP_S
+                          #\LATIN_SMALL_LETTER_A_WITH_DIAERESIS
+                          #\LATIN_SMALL_LETTER_O_WITH_DIAERESIS
+                          #\LATIN_CAPITAL_LETTER_U_WITH_DIAERESIS
+                          #\LATIN_CAPITAL_LETTER_A_WITH_DIAERESIS))
+      ;; Currency symbols: micro sign, pound, yen, cent (all in CP37)
+      (insert-msg (format nil "~C 100~C ~C 50~C ~C 200~C"
+                          #\MICRO_SIGN #\POUND_SIGN
+                          #\YEN_SIGN #\CENT_SIGN
+                          #\SECTION_SIGN #\DEGREE_SIGN))
+      ;; Euro sign (in CP310 via graphic escape)
+      (insert-msg (format nil "Preis: 42~C incl. MwSt" #\EURO_SIGN))
+      ;; Mixed special chars
+      (insert-msg (format nil "~C 3 Abs. 1 bei 20~CC"
+                          #\SECTION_SIGN #\DEGREE_SIGN)))))
+
+(define-test e2e-chat-special-characters ()
+  (with-test-db (db-name)
+    (create-test-user "chatuser" "chatpass")
+    (let ((channel-id (veron::default-chat-channel-id)))
+      (insert-special-char-messages channel-id))
+    (veron::load-chat-from-db)
+    (with-test-app (s veron::*veron-app*)
+      (login s "chatuser" "chatpass")
+      ;; Navigate to chat - check error line if it fails
+      (move-cursor s 21 14)
+      (erase-eof s)
+      (type-text s "chat")
+      (press-enter s)
+      (let ((error-row (screen-row s 22)))
+        (assert (not (search "Incident" error-row)) ()
+                "Navigating to chat with special characters should not cause an incident: ~A"
+                (string-trim '(#\Space) error-row)))
+      (assert-on-screen s "CHAT")
+      ;; Verify CP37 characters survived the round trip
+      (assert-screen-contains s (format nil "Gr~C~Ce"
+                                        #\LATIN_SMALL_LETTER_U_WITH_DIAERESIS
+                                        #\LATIN_SMALL_LETTER_SHARP_S)
+                              :description "German umlauts should display correctly")
+      (assert-screen-contains s (format nil "~C 100~C"
+                                        #\MICRO_SIGN #\POUND_SIGN)
+                              :description "Micro sign and pound sign should display")
+      (assert-screen-contains s (format nil "~C 50~C"
+                                        #\YEN_SIGN #\CENT_SIGN)
+                              :description "Yen sign and cent sign should display")
+      ;; Euro sign is in CP310 (graphic escape)
+      (assert-screen-contains s (format nil "42~C" #\EURO_SIGN)
+                              :description "Euro sign via graphic escape should display")
+      ;; Section sign and degree
+      (assert-screen-contains s (format nil "~C 3 Abs. 1" #\SECTION_SIGN)
+                              :description "Section sign should display")
+      (assert-screen-contains s (format nil "20~CC" #\DEGREE_SIGN)
+                              :description "Degree sign should display")
+      (press-key s :pf3))))

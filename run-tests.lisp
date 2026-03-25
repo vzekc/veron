@@ -14,5 +14,7 @@
 
 (ql:quickload :veron-test)
 
-(unless (lispf-test:run-all-suites)
-  (uiop:quit 1))
+(unwind-protect
+     (unless (lispf-test:run-all-suites)
+       (uiop:quit 1))
+  (veron-tests::drop-template-db))

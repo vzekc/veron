@@ -2,10 +2,11 @@
 
 ;;; Test harness for VERON E2E tests.
 ;;; Manages temporary databases and the VERON application lifecycle.
+;;; Uses a template database with migrations pre-applied for fast test DB creation.
 
 (in-package #:veron-tests)
 
-;;; Temporary database management
+;;; Database connection parameters
 
 (defun admin-db-params ()
   "Connection parameters for the admin database (used to create/drop test DBs)."
@@ -15,26 +16,6 @@
         (or (uiop:getenv "VERON_DB_HOST") "localhost")
         :port (parse-integer (or (uiop:getenv "VERON_DB_PORT") "5432"))
         :pooled-p nil))
-
-(defun generate-test-db-name ()
-  "Generate a unique test database name."
-  (format nil "veron_test_~D_~D"
-          (sb-posix:getpid)
-          (mod (get-internal-real-time) 100000)))
-
-(defun create-test-db (db-name)
-  "Create a fresh test database."
-  (pomo:with-connection (admin-db-params)
-    (pomo:execute (format nil "CREATE DATABASE ~A" db-name))))
-
-(defun drop-test-db (db-name)
-  "Drop a test database, terminating any active connections first."
-  (pomo:with-connection (admin-db-params)
-    (ignore-errors
-     (pomo:execute
-      (format nil "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '~A'" db-name)))
-    (ignore-errors
-     (pomo:execute (format nil "DROP DATABASE IF EXISTS ~A" db-name)))))
 
 (defun test-db-params (db-name)
   "Connection parameters for a test database."
@@ -46,17 +27,66 @@
           :port (getf (cddddr admin) :port)
           :pooled-p nil)))
 
+;;; Template database management
+
+(defvar *template-db-name* nil
+  "Name of the current template database, or NIL if not yet created.")
+
+(defun generate-db-name (prefix)
+  (format nil "~A_~D_~D" prefix (sb-posix:getpid)
+          (mod (get-internal-real-time) 100000)))
+
+(defun ensure-template-db ()
+  "Create the template database if it doesn't exist. Returns the template name.
+The template has all migrations applied and is ready to be cloned."
+  (or *template-db-name*
+      (let ((name (generate-db-name "veron_tmpl")))
+        (pomo:with-connection (admin-db-params)
+          (pomo:execute (format nil "CREATE DATABASE ~A" name)))
+        (let ((veron::*db-params* (test-db-params name)))
+          (veron::with-db (veron::run-migrations)))
+        (pomo:clear-connection-pool)
+        (setf *template-db-name* name))))
+
+(defun drop-template-db ()
+  "Drop the template database if it exists."
+  (when *template-db-name*
+    (pomo:with-connection (admin-db-params)
+      (ignore-errors
+       (pomo:execute
+        (format nil "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '~A'"
+                *template-db-name*)))
+      (ignore-errors
+       (pomo:execute (format nil "DROP DATABASE IF EXISTS ~A" *template-db-name*))))
+    (setf *template-db-name* nil)))
+
+;;; Test database lifecycle
+
+(defun create-test-db (db-name)
+  "Create a test database by cloning the template."
+  (let ((template (ensure-template-db)))
+    (pomo:with-connection (admin-db-params)
+      (pomo:execute (format nil "CREATE DATABASE ~A TEMPLATE ~A" db-name template)))))
+
+(defun drop-test-db (db-name)
+  "Drop a test database, terminating any active connections first."
+  (pomo:with-connection (admin-db-params)
+    (ignore-errors
+     (pomo:execute
+      (format nil "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '~A'" db-name)))
+    (ignore-errors
+     (pomo:execute (format nil "DROP DATABASE IF EXISTS ~A" db-name)))))
+
 (defmacro with-test-db ((db-name-var) &body body)
-  "Create a temporary database, run migrations, execute BODY, then drop it.
+  "Create a temporary database from the template, execute BODY, then drop it.
 Sets veron::*db-params* globally (so app threads see it) and restores on exit."
   (let ((saved-params (gensym "SAVED-PARAMS")))
-    `(let ((,db-name-var (generate-test-db-name))
+    `(let ((,db-name-var (generate-db-name "veron_test"))
            (,saved-params veron::*db-params*))
        (create-test-db ,db-name-var)
        (unwind-protect
             (progn
               (setf veron::*db-params* (test-db-params ,db-name-var))
-              (veron::with-db (veron::run-migrations))
               ,@body)
          (setf veron::*db-params* ,saved-params)
          (pomo:clear-connection-pool)
@@ -86,7 +116,7 @@ Creates a test user with USERNAME/PASSWORD and binds SESSION-VAR to the s3270 se
 
 ;;; Screen observation
 
-(defun wait-for-screen-match (session predicate &key (timeout 5.0) (interval 0.1))
+(defun wait-for-screen-match (session predicate &key (timeout 5.0))
   "Poll the screen until PREDICATE returns true for the full screen text.
 PREDICATE receives a single string (all rows joined with newlines).
 Returns T if matched, NIL if timed out."

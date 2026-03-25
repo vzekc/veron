@@ -21,13 +21,13 @@ check_login_screen() {
     echo "--- Testing $label ---"
     local result
     if ! result=$(printf 'Connect(%s)\nWait(10,3270Mode)\nWait(10,Unlock)\nAscii()\nDisconnect()\nQuit()\n' \
-                         "$s3270_args" | s3270 2>/dev/null); then
+                         "$s3270_args" | s3270 -noverifycert 2>/dev/null); then
         echo "FAIL: s3270 exited with error"
         FAILED=$((FAILED + 1))
         return
     fi
 
-    if echo "$result" | grep -q "Username"; then
+    if echo "$result" | grep -q "Benutzername"; then
         echo "PASS: login screen detected"
         PASSED=$((PASSED + 1))
     else

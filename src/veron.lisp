@@ -396,17 +396,22 @@
       (when (and output (plusp (length output)))
         (uiop:split-string output :separator '(#\Newline))))))
 
-(defun format-changelog-entry (titles)
-  "Format a changelog entry block with timestamp heading and indented titles."
+(defun format-changelog-entry (hash titles)
+  "Format a changelog entry block with timestamp heading, hash, and indented titles."
   (with-output-to-string (s)
     (multiple-value-bind (sec min hour day month year)
         (decode-display-time (get-universal-time))
       (declare (ignore sec))
-      (format s "=== ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D ===~%"
-              day month year hour min))
+      (format s "=== ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D (~A) ===~%"
+              day month year hour min hash))
     (dolist (title titles)
       (format s "    ~A~%" title))
     (terpri s)))
+
+(defun changelog-contains-hash-p (hash)
+  "Return T if the changelog already contains an entry for HASH."
+  (let ((text (load-changelog-text)))
+    (search (format nil "(~A)" hash) text)))
 
 (defun append-changelog-deployment ()
   "If there are new commits since last deploy, prepend a changelog entry.
@@ -414,8 +419,8 @@ Returns T if an entry was added."
   (let ((current-hash (git-short-hash)))
     (unless current-hash
       (return-from append-changelog-deployment nil))
-    (when (and *last-deploy-hash*
-               (string= current-hash *last-deploy-hash*))
+    (when (changelog-contains-hash-p current-hash)
+      (setf *last-deploy-hash* current-hash)
       (return-from append-changelog-deployment nil))
     (let ((titles (if *last-deploy-hash*
                       (git-commit-titles-since *last-deploy-hash*)
@@ -427,7 +432,7 @@ Returns T if an entry was added."
                           (when (and output (plusp (length output)))
                             (list (string-trim '(#\Newline #\Return #\Space) output))))))))
       (when titles
-        (let* ((new-block (format-changelog-entry titles))
+        (let* ((new-block (format-changelog-entry current-hash titles))
                (existing (load-changelog-text))
                (combined (concatenate 'string new-block existing)))
           (save-changelog-text combined))))

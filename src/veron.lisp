@@ -433,7 +433,8 @@ Called via Swank during deployment. Existing sessions continue running."
   (dolist (sys '(:veron :lispf :lispf-edit :woltlab-login))
     (asdf:clear-system sys))
   (format t "~&;;; VERON: reloading code~%")
-  (funcall (find-symbol "QUICKLOAD" :ql) :veron)
+  (handler-bind ((style-warning #'muffle-warning))
+    (funcall (find-symbol "QUICKLOAD" :ql) :veron))
   ;; After quickload, reload-post-code is the new version
   (reload-post-code)
   (format t "~&;;; VERON: hot-reload complete~%")

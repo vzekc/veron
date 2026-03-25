@@ -1,0 +1,16 @@
+(:name "login-otp"
+ :anonymous t
+ :screen "
+
+   Einmalpasswort
+
+   Ein Einmalpasswort wurde gesendet an:
+
+   Benutzername:
+   Passwort:
+"
+ :fields ((:from (3 44) :len 30 :name email-display)
+          (:from (5 17) :len 21 :name username)
+          (:from (6 17) :len 6 :name otp-code :write t :hidden t :transient t))
+ :keys ((:enter "Login")
+        (:pf3 "Zurueck")))

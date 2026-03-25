@@ -1,0 +1,13 @@
+(:name "login-local"
+ :anonymous t
+ :screen "
+
+   Anmeldung mit lokalem Passwort
+
+   Benutzername:
+   Passwort:
+"
+ :fields ((:from (3 17) :len 21 :name username)
+          (:from (4 17) :len 62 :name password :write t :hidden t :transient t))
+ :keys ((:enter "Login")
+        (:pf3 "Zurueck")))

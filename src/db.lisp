@@ -88,6 +88,18 @@
               :email ""
               :groups nil)))))
 
+(defun has-local-password-p (username)
+  "Return T if USERNAME has a local password set."
+  (with-db
+    (pomo:query "SELECT EXISTS(SELECT 1 FROM users WHERE name = $1 AND local_password IS NOT NULL)"
+                username :single)))
+
+(defun save-local-password (user-id password)
+  "Set the local password for a user."
+  (with-db
+    (pomo:execute "UPDATE users SET local_password = $1 WHERE id = $2"
+                  (hash-password password) user-id)))
+
 (defun ensure-db-user (user)
   (with-db
     (pomo:execute

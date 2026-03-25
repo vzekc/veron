@@ -1,0 +1,26 @@
+(:name "goodbye"
+ :full-control t
+ :screen "
+
+   VVVV      VVVV EEEEEEEEEEEEEE RRRRRRRRRRRR     OOOOOOOOOO   NNNN      NNNN
+   VVVV      VVVV EEEEEEEEEEEEEE RRRRRRRRRRRR     OOOOOOOOOO   NNNN      NNNN
+   VVVV      VVVV EEEE           RRRR      RRRR OOOO      OOOO NNNNNN    NNNN
+   VVVV      VVVV EEEE           RRRR      RRRR OOOO      OOOO NNNNNN    NNNN
+   VVVV      VVVV EEEE           RRRR      RRRR OOOO      OOOO NNNNNNNN  NNNN
+   VVVV      VVVV EEEE           RRRR      RRRR OOOO      OOOO NNNNNNNN  NNNN
+   VVVVVV  VVVVVV EEEEEEEEEEEE   RRRR    RRRRRR OOOO      OOOO NNNN  NNNNNNNN
+   VVVVVV  VVVVVV EEEEEEEEEEEE   RRRR    RRRRRR OOOO      OOOO NNNN  NNNNNNNN
+     VVVVVVVVVV   EEEE           RRRRRRRRRR     OOOO      OOOO NNNN    NNNNNN
+     VVVVVVVVVV   EEEE           RRRRRRRRRR     OOOO      OOOO NNNN    NNNNNN
+       VVVVVV     EEEE           RRRR  RRRRRR   OOOO      OOOO NNNN      NNNN
+       VVVVVV     EEEE           RRRR  RRRRRR   OOOO      OOOO NNNN      NNNN
+         VV       EEEEEEEEEEEEEE RRRR    RRRRRR   OOOOOOOOOO   NNNN      NNNN
+         VV       EEEEEEEEEEEEEE RRRR    RRRRRR   OOOOOOOOOO   NNNN      NNNN
+
+                   V.z.E.k.C. Electronic Retro Online Network
+
+        Vielen Dank fuer Ihren Besuch. Bis zum naechsten Mal!
+"
+ :fields ((:from (16 18) :len 43 :intense t :color pink)
+          (:from (18 8) :len 55 :intense t :color turquoise))
+ :keys ())

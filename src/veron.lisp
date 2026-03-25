@@ -124,6 +124,20 @@
     (when user
       (notify :logout "Abmeldung"
               (format nil "~A hat sich abgemeldet" (user-username user)))))
+  'goodbye)
+
+;;; Goodbye screen - display and disconnect
+
+(lspf:define-screen-update goodbye ()
+  (let* ((screen-info (lspf::ensure-screen-loaded 'goodbye))
+         (screen (lspf::screen-info-screen screen-info))
+         (vals (cl3270:make-dict :test #'equal)))
+    (cl3270:show-screen-opts screen vals lspf::*connection*
+      (cl3270:make-screen-opts
+       :altscreen lspf:*device-info*
+       :codepage (when lspf:*device-info*
+                   (cl3270::codepage lspf:*device-info*))
+       :no-response t)))
   :logoff)
 
 ;;; About screen

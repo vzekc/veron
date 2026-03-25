@@ -116,32 +116,30 @@ Returns the full list of formatted lines."
   (list :content (format-chat-divider) :color cl3270:+yellow+))
 
 (lspf:define-dynamic-area-updater chat messages ()
-  (let* ((all-lines (chat-all-formatted-lines))
-         (total (length all-lines))
-         (offset (chat-scroll-offset))
-         (divider (chat-divider-line)))
-    (when (and (not offset)
-               (lspf:session-property lspf:*session* :chat-pm-pending))
-      (setf (lspf:session-property lspf:*session* :chat-pm-pending) nil)
-      (update-my-chat-indicator))
-    (append
-     (cond
-       ;; Scrolled back: show page ending at offset
-       (offset
-        (let* ((end (min offset total))
-               (start (max 0 (- end +chat-display-lines+)))
-               (page (subseq all-lines start end))
-               (n (length page)))
-          (if (< n +chat-display-lines+)
-              (append page
-                      (make-list (- +chat-display-lines+ n) :initial-element ""))
-              page)))
-       ;; Live view: bottom-align last page
-       ((<= total +chat-display-lines+)
-        (append (make-list (- +chat-display-lines+ total) :initial-element "")
-                all-lines))
-       (t (last all-lines +chat-display-lines+)))
-     (list divider))))
+  `(,@(let* ((all-lines (chat-all-formatted-lines))
+             (total (length all-lines))
+             (offset (chat-scroll-offset)))
+        (when (and (not offset)
+                   (lspf:session-property lspf:*session* :chat-pm-pending))
+          (setf (lspf:session-property lspf:*session* :chat-pm-pending) nil)
+          (update-my-chat-indicator))
+        (cond
+          ;; Scrolled back: show page ending at offset
+          (offset
+           (let* ((end (min offset total))
+                  (start (max 0 (- end +chat-display-lines+)))
+                  (page (subseq all-lines start end))
+                  (n (length page)))
+             (if (< n +chat-display-lines+)
+                 (append page
+                         (make-list (- +chat-display-lines+ n) :initial-element ""))
+                 page)))
+          ;; Live view: bottom-align last page
+          ((<= total +chat-display-lines+)
+           (append (make-list (- +chat-display-lines+ total) :initial-element "")
+                   all-lines))
+          (t (last all-lines +chat-display-lines+))))
+    ,(chat-divider-line)))
 
 ;;; Chat input handling
 

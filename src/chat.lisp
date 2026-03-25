@@ -135,7 +135,7 @@ EINER specifies the word for 1 (einer for feminine, einem for dative masculine).
       (push (german-unit hours "Stunde" "Stunden") parts))
     (when (plusp days)
       (push (german-unit days "Tag" "Tagen" :einer "einem") parts))
-    (format nil "nach ~{~A~^, ~} Schweigen" parts)))
+    (format nil "nach ~{~A~^, ~} Stille" parts)))
 
 (defun format-silence-divider (timestamp gap-seconds)
   "Format a silence divider with absolute time and duration."

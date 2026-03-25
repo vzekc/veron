@@ -287,7 +287,7 @@ Returns the per-user buffer."
 
 (defun add-own-message (channel-id user message raw-input)
   "Send a message: add to shared buffer, add locally as :own, skip during sync."
-  (let ((msg (add-chat-message channel-id user message)))
+  (let ((msg (add-chat-message channel-id user "~A" message)))
     ;; Add to own buffer with :own flag and raw input text
     (let ((own-msg (list* :own t :raw-input raw-input msg)))
       (vector-push-extend own-msg (user-chat-buffer)))

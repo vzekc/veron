@@ -69,10 +69,6 @@
 (defmethod lspf:anonymous-access-denied-message ((app (eql *veron-app*)))
   "Anmeldung erforderlich")
 
-(defmethod lspf:session-idle-timeout ((app (eql *veron-app*)) session)
-  (case (lspf:session-current-screen session)
-    (login 60)
-    (otherwise nil)))
 
 ;;; Utility
 
@@ -132,19 +128,16 @@
               (format nil "~A hat sich abgemeldet" (user-username user)))))
   'goodbye)
 
-;;; Goodbye screen - display and disconnect
+;;; Goodbye screen - display for 5 seconds, then disconnect
 
-(lspf:define-screen-update goodbye ()
-  (let* ((screen-info (lspf::ensure-screen-loaded 'goodbye))
-         (screen (lspf::screen-info-screen screen-info))
-         (vals (cl3270:make-dict :test #'equal)))
-    (cl3270:show-screen-opts screen vals lspf::*connection*
-      (cl3270:make-screen-opts
-       :altscreen lspf:*device-info*
-       :codepage (when lspf:*device-info*
-                   (cl3270::codepage lspf:*device-info*))
-       :no-response t)))
+(lspf:define-key-handler goodbye :pf3 ()
   :logoff)
+
+(defmethod lspf:session-idle-timeout ((app (eql *veron-app*)) session)
+  (case (lspf:session-current-screen session)
+    (login 60)
+    (goodbye 5)
+    (otherwise nil)))
 
 ;;; About screen
 

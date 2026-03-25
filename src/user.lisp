@@ -17,11 +17,12 @@
   "List of WoltLab group names that grant admin privileges.")
 
 (defun admin-p (user)
-  "Return T if USER belongs to any admin group."
+  "Return T if USER belongs to any admin group or has the is_admin flag set."
   (and user
-       (some (lambda (group)
-               (member (getf group :group-name) *admin-groups* :test #'string=))
-             (user-groups user))))
+       (or (some (lambda (group)
+                   (member (getf group :group-name) *admin-groups* :test #'string=))
+                 (user-groups user))
+           (user-admin-db-p (user-id user)))))
 
 (defun make-user (auth-result)
   "Create a user from an authenticate-user result plist."

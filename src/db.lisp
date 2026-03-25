@@ -155,6 +155,18 @@ MINUTES-AGO is how many minutes since the OTP was sent (based on 5min expiry win
     (pomo:execute "UPDATE users SET otp_code = NULL, otp_expires = NULL WHERE name = $1"
                   username)))
 
+(defun user-admin-db-p (user-id)
+  "Return T if the user has the is_admin flag set in the database."
+  (with-db
+    (pomo:query "SELECT is_admin FROM users WHERE id = $1"
+                user-id :single)))
+
+(defun set-user-admin (username admin-p)
+  "Set the is_admin flag for USERNAME."
+  (with-db
+    (pomo:execute "UPDATE users SET is_admin = $1 WHERE name = $2"
+                  admin-p username)))
+
 (defun ensure-db-user (user)
   (with-db
     (pomo:execute

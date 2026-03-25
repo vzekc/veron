@@ -138,10 +138,13 @@ Returns T if matched, NIL if timed out."
 ;;; Helpers
 
 (defun login (session username password)
-  "Log into the VERON application."
+  "Log into the VERON application.
+Non-TLS connections go through the login-local screen."
   (assert-on-screen session "LOGIN")
-  (type-in-field session *login-screen* "username" username)
-  (type-in-field session *login-screen* "password" password)
+  (type-text session username)
+  (press-enter session)
+  (assert-on-screen session "LOGIN-LOCAL")
+  (type-text session password)
   (press-enter session)
   (assert-on-screen session "MAIN"))
 
@@ -174,11 +177,13 @@ Must be used inside with-veron-app."
 ;;; Screen data
 
 (defvar *login-screen* nil)
+(defvar *login-local-screen* nil)
 (defvar *guestbook-new-screen* nil)
 
 (defun load-screen-data ()
   (let ((dir (merge-pathnames #P"screens/"
                               (asdf:system-source-directory :veron))))
     (setf *login-screen* (load-test-screen-data (merge-pathnames "login.screen" dir))
+          *login-local-screen* (load-test-screen-data (merge-pathnames "login-local.screen" dir))
           *guestbook-new-screen* (load-test-screen-data
                                   (merge-pathnames "guestbook-new.screen" dir)))))

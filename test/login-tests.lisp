@@ -37,16 +37,16 @@
   (let ((correct-password "short"))
     (with-veron-app (s :username "clearuser" :password correct-password)
       (assert-on-screen s "LOGIN")
-      ;; Type wrong long password and submit
-      (type-in-field s *login-screen* "username" "clearuser")
-      (type-in-field s *login-screen* "password" "this-is-a-very-wrong-long-password")
+      ;; Enter username to get to login-local
+      (type-text s "clearuser")
       (press-enter s)
-      ;; Should stay on login screen with error
-      (assert-on-screen s "LOGIN")
-      ;; Now type correct short password and login.
-      ;; The server clears the password field via screen update, so
-      ;; typing the short password without erasing first must work.
-      (type-in-field s *login-screen* "username" "clearuser")
-      (type-in-field s *login-screen* "password" correct-password)
+      (assert-on-screen s "LOGIN-LOCAL")
+      ;; Type wrong long password and submit
+      (type-text s "this-is-a-very-wrong-long-password")
+      (press-enter s)
+      ;; Should stay on login-local with error
+      (assert-on-screen s "LOGIN-LOCAL")
+      ;; Now type correct short password and login
+      (type-text s correct-password)
       (press-enter s)
       (assert-on-screen s "MAIN"))))

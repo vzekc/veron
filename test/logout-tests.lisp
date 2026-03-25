@@ -17,15 +17,16 @@
 (define-test e2e-logout-normal-records-time ()
   (with-veron-app (s :username "loguser" :password "logpass")
     (login s "loguser" "logpass")
-    ;; Logout normally
+    ;; Logout normally: PF3 to logout screen, PF5 to confirm
     (press-key s :pf3)
     (assert-on-screen s "LOGOUT")
     (press-key s :pf5)
-    ;; Session should disconnect - wait for session thread to finish
-    (sleep 0.5)
-    ;; Check the login record has a logout timestamp
-    (assert (last-login-has-logout-p) ()
-            "Normal logout should record logout_at")))
+    ;; Goodbye screen is displayed; press PF3 to disconnect cleanly
+    (wait-for-field s)
+    (press-key s :pf3))
+  ;; with-test-app waits for session drain; check logout was recorded
+  (assert (last-login-has-logout-p) ()
+          "Normal logout should record logout_at"))
 
 ;;; Connection drop (client disconnect) should also record logout time.
 

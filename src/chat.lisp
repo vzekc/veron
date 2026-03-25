@@ -19,23 +19,40 @@
 (defvar *chat-id-counter* 0
   "Monotonically increasing message ID for in-memory messages.")
 
+(defun make-chat-message (type format &rest args)
+  "Create a chat message plist with TYPE (:message or :notification) and formatted text."
+  (list :type type
+        :message (apply #'format nil format args)
+        :created-at (get-universal-time)))
+
+(defun message-type (msg)
+  "Return the type keyword of MSG (:message or :notification)."
+  (getf msg :type :message))
+
+(defun notification-p (msg)
+  "Return T if MSG is a system notification (join/leave)."
+  (eq (message-type msg) :notification))
+
 (defun load-chat-from-db ()
   "Load all chat messages from the database into RAM."
-  (with-db
-    (let ((channels (pomo:query "SELECT id FROM chat_channels" :column)))
-      (dolist (channel-id channels)
-        (let ((msgs (pomo:query
-                     "SELECT id, username, message, created_at FROM chat_messages
-                      WHERE channel_id = $1 ORDER BY id ASC"
-                     channel-id :plists)))
-          (setf (gethash channel-id *chat-messages*)
-                (make-array (length msgs)
-                            :adjustable t :fill-pointer (length msgs)
-                            :initial-contents msgs))
-          (when msgs
-            (setf *chat-id-counter*
-                  (max *chat-id-counter*
-                       (getf (car (last msgs)) :id)))))))))
+  (dolist (channel-id (chat-channel-ids))
+    (let ((msgs (chat-channel-messages channel-id)))
+      (setf msgs
+            (mapcar (lambda (msg)
+                      (let ((mtype (getf msg :message-type)))
+                        (remf msg :message-type)
+                        (list* :type (intern (string-upcase (or mtype "message"))
+                                             :keyword)
+                               msg)))
+                    msgs))
+      (setf (gethash channel-id *chat-messages*)
+            (make-array (length msgs)
+                        :adjustable t :fill-pointer (length msgs)
+                        :initial-contents msgs))
+      (when msgs
+        (setf *chat-id-counter*
+              (max *chat-id-counter*
+                   (getf (car (last msgs)) :id)))))))
 
 (defun ensure-channel-buffer (channel-id)
   "Ensure a message buffer exists for CHANNEL-ID."
@@ -52,29 +69,35 @@
 
 (defun default-channel-id ()
   "Return the ID of the default chat channel."
-  (with-db
-    (pomo:query "SELECT id FROM chat_channels WHERE name = 'allgemein'" :single)))
+  (default-chat-channel-id))
 
 ;;; Message operations
 
-(defun add-chat-message (channel-id user message)
-  "Add a chat message to the shared buffer and persist to DB.
-Returns the message plist (for local rendering by the sender)."
-  (let* ((now (get-universal-time))
-         (db-id (with-db
-                  (pomo:query
-                   "INSERT INTO chat_messages (channel_id, user_id, username, message)
-                    VALUES ($1, $2, $3, $4) RETURNING id"
-                   channel-id (user-id user) (user-username user) message :single)))
-         (msg (list :id db-id
-                    :username (user-username user)
-                    :message message
-                    :created-at now)))
+(defun add-chat-entry (channel-id user type message)
+  "Add a message to the shared buffer and persist to DB.
+TYPE is :message or :notification. Returns the message plist."
+  (let* ((type-string (string-downcase (symbol-name type)))
+         (db-id (insert-chat-message channel-id (user-id user) (user-username user)
+                                     message type-string))
+         (msg (list* :id db-id
+                     :type type
+                     :message message
+                     :created-at (get-universal-time)
+                     (when (eq type :message)
+                       (list :username (user-username user))))))
     (bt:with-lock-held (*chat-lock*)
       (let ((buf (ensure-channel-buffer channel-id)))
         (vector-push-extend msg buf))
       (setf *chat-id-counter* (max *chat-id-counter* db-id)))
     msg))
+
+(defun add-chat-message (channel-id user format &rest args)
+  "Add a regular chat message."
+  (add-chat-entry channel-id user :message (apply #'format nil format args)))
+
+(defun add-chat-notification (channel-id user format &rest args)
+  "Add a system notification message (join/leave)."
+  (add-chat-entry channel-id user :notification (apply #'format nil format args)))
 
 ;;; Message formatting
 
@@ -217,7 +240,7 @@ Returns a list of strings or plists (for colored lines)."
                       :color cl3270:+turquoise+)
                 lines))
         (when timestamp (setf last-time timestamp))
-        (let* ((notification-p (getf msg :notification))
+        (let* ((notification-p (notification-p msg))
                (msg-lines (cond (notification-p
                                  (word-wrap (getf msg :message) 80))
                                 ((and own-p (getf msg :raw-input))
@@ -231,6 +254,7 @@ Returns a list of strings or plists (for colored lines)."
                         (t (list :content line :color cl3270:+white+)))
                   lines)))))
     (nreverse lines)))
+
 
 ;;; Per-user message buffer
 
@@ -253,7 +277,6 @@ Returns the per-user buffer."
     (when (< synced shared-len)
       (loop for i from synced below shared-len
             for msg = (aref shared i)
-            ;; Skip own messages (already in buffer from local add)
             unless (and my-name (string-equal (getf msg :username) my-name)
                         (lspf:session-property lspf:*session* :chat-sent-ids)
                         (member (getf msg :id)

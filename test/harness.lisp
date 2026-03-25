@@ -30,9 +30,11 @@
 (defun drop-test-db (db-name)
   "Drop a test database, terminating any active connections first."
   (pomo:with-connection (admin-db-params)
-    (pomo:execute
-     (format nil "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '~A'" db-name))
-    (pomo:execute (format nil "DROP DATABASE IF EXISTS ~A" db-name))))
+    (ignore-errors
+     (pomo:execute
+      (format nil "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '~A'" db-name)))
+    (ignore-errors
+     (pomo:execute (format nil "DROP DATABASE IF EXISTS ~A" db-name)))))
 
 (defun test-db-params (db-name)
   "Connection parameters for a test database."
@@ -57,6 +59,7 @@ Sets veron::*db-params* globally (so app threads see it) and restores on exit."
               (veron::with-db (veron::run-migrations))
               ,@body)
          (setf veron::*db-params* ,saved-params)
+         (pomo:clear-connection-pool)
          (drop-test-db ,db-name-var)))))
 
 ;;; Test user management
@@ -98,6 +101,24 @@ Creates a test user with USERNAME/PASSWORD and binds SESSION-VAR to the s3270 se
   (type-text session (string-downcase screen-name))
   (press-enter session)
   (assert-on-screen session screen-name))
+
+;;; Additional sessions
+
+(defmacro with-secondary-session ((session-var &key (username "testuser2") (password "testpass2")
+                                                 (id 99998))
+                                &body body)
+  "Create a second user and s3270 session against the running test app.
+Must be used inside with-veron-app."
+  (let ((s3270-var (gensym "S3270")))
+    `(progn
+       (create-test-user ,username ,password :id ,id)
+       (let ((,s3270-var (launch-s3270)))
+         (s3270-connect ,s3270-var "127.0.0.1" *test-app-port*)
+         (unwind-protect
+              (let ((,session-var ,s3270-var))
+                ,@body)
+           (ignore-errors (s3270-disconnect ,s3270-var))
+           (ignore-errors (close-s3270 ,s3270-var)))))))
 
 ;;; Screen data
 

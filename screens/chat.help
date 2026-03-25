@@ -1,0 +1,16 @@
+Chat
+Nachrichten eingeben und mit ENTER senden.
+Alle oeffentlichen Nachrichten werden in der Datenbank gespeichert.
+
+BEFEHLE:
+  /msg <Name> <Nachricht>   Private Nachricht senden
+                             (wird nicht gespeichert,
+                             Empfaenger muss online sein)
+  /who                       Wer ist im Chat?
+  /quit                      Chat verlassen
+
+TASTEN:
+  ENTER      Nachricht senden
+  PF1        Hilfe anzeigen
+  PF3        Chat verlassen
+  PF7/PF8    Aeltere/neuere Nachrichten

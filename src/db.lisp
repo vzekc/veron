@@ -121,9 +121,7 @@ Numeric values: -1 = CET (UTC+1), -2 = CEST (UTC+2), etc.")
 
 (defun decode-display-time (universal-time)
   "Decode a universal time using the display timezone."
-  (if *display-timezone*
-      (decode-universal-time universal-time *display-timezone*)
-      (decode-universal-time universal-time)))
+  (decode-universal-time universal-time *display-timezone*))
 
 (defun format-date (universal-time)
   "Format a universal time as DD.MM.YYYY in the display timezone."
@@ -185,3 +183,29 @@ Numeric values: -1 = CET (UTC+1), -2 = CEST (UTC+2), etc.")
 (defun login-log-count ()
   (with-db
     (pomo:query "SELECT COUNT(*) FROM logins" :single)))
+
+;;; Chat persistence
+
+(defun chat-channel-ids ()
+  (with-db
+    (pomo:query "SELECT id FROM chat_channels" :column)))
+
+(defun chat-channel-messages (channel-id)
+  (with-db
+    (pomo:query
+     "SELECT id, username, message, created_at, message_type
+      FROM chat_messages
+      WHERE channel_id = $1 ORDER BY id ASC"
+     channel-id :plists)))
+
+(defun default-chat-channel-id ()
+  (with-db
+    (pomo:query "SELECT id FROM chat_channels WHERE name = 'allgemein'" :single)))
+
+(defun insert-chat-message (channel-id user-id username message message-type)
+  "Insert a chat message and return its ID."
+  (with-db
+    (pomo:query
+     "INSERT INTO chat_messages (channel_id, user_id, username, message, message_type)
+      VALUES ($1, $2, $3, $4, $5) RETURNING id"
+     channel-id user-id username message message-type :single)))

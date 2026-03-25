@@ -75,6 +75,16 @@
 
 ;;; OTP phase management
 
+(defun ensure-user-row (username)
+  "Ensure a users row exists for USERNAME by looking up WoltLab data.
+Required before store-otp, which UPDATEs the row."
+  (let ((result (lookup-woltlab-user username)))
+    (when result
+      (with-db
+        (pomo:execute
+         "INSERT INTO users (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING"
+         (getf result :user-id) (getf result :username))))))
+
 (defun prepare-otp-login (username)
   "Look up email, generate OTP if needed, send email. Store state on session.
 Reuses an active OTP from the database if one exists.
@@ -84,6 +94,7 @@ Returns the masked email string. Signals application-error on failure."
       (lspf:application-error "Benutzer nicht gefunden"))
     (when (string= email "")
       (lspf:application-error "Keine E-Mail-Adresse hinterlegt"))
+    (ensure-user-row username)
     (multiple-value-bind (existing minutes-ago) (get-active-otp username)
       (let ((session lspf:*session*))
         (setf (session-otp-username session) username

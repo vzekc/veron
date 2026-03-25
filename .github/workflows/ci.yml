@@ -48,6 +48,12 @@ jobs:
           path: ~/quicklisp
           key: quicklisp-${{ runner.os }}
 
+      - name: Cache FASL files
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/common-lisp
+          key: fasl-${{ runner.os }}-${{ hashFiles('**/*.lisp', '**/*.asd') }}
+
       - name: Install Quicklisp
         run: |
           if [ ! -f "$HOME/quicklisp/setup.lisp" ]; then

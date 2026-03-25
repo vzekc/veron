@@ -140,7 +140,7 @@ Returns T if matched, NIL if timed out."
 (defun login (session username password)
   "Log into the VERON application.
 Non-TLS connections go through the login-local screen.
-If redirected to the changelog screen, press PF3 to reach MAIN."
+If redirected to the changelog screen, press Enter to reach MAIN."
   (assert-on-screen session "LOGIN")
   (type-text session username)
   (press-enter session)
@@ -150,7 +150,7 @@ If redirected to the changelog screen, press PF3 to reach MAIN."
   (let ((title-row (string-trim '(#\Space) (screen-row session 0))))
     (when (and (>= (length title-row) 9)
                (string= "CHANGELOG" (subseq title-row 0 9)))
-      (press-key session :pf3)))
+      (press-enter session)))
   (assert-on-screen session "MAIN"))
 
 (defun navigate-to (session screen-name)

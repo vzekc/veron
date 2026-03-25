@@ -450,9 +450,11 @@ Returns T if an entry was added."
   "Return the screen to navigate to after login.
 If the changelog has unread entries, go to changelog; otherwise main."
   (let ((user (session-user lspf:*session*)))
-    (if (and user (changelog-unread-p (user-id user)))
-        'changelog
-        'main)))
+    (cond
+      ((and user (changelog-unread-p (user-id user)))
+       (setf (lspf:session-property lspf:*session* :changelog-post-login) t)
+       'changelog)
+      (t 'main))))
 
 ;;; Server entry point
 

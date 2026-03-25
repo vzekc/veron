@@ -27,6 +27,7 @@
 
 (lspf:define-screen-update changelog (page-info)
   (let* ((user (session-user lspf:*session*))
+         (post-login (lspf:session-property lspf:*session* :changelog-post-login))
          (all-lines (changelog-lines))
          (total (length all-lines))
          (offset (or (lspf:session-property lspf:*session* :changelog-offset) 0))
@@ -35,6 +36,11 @@
     (when user
       (mark-changelog-read (user-id user)))
     (setf page-info (format nil "Seite ~D von ~D" page-num total-pages))
+    (if post-login
+        (progn
+          (lspf:hide-key :pf3)
+          (lspf:show-key :enter "Weiter"))
+        (lspf:show-key :pf3 "Zurueck"))
     (when (> offset 0)
       (lspf:show-key :pf7 "Vor."))
     (when (< (+ offset +changelog-display-lines+) total)
@@ -75,9 +81,20 @@
       (setf (lspf:session-property lspf:*session* :changelog-offset) new-offset)))
   :stay)
 
+(lspf:define-key-handler changelog :enter ()
+  (if (lspf:session-property lspf:*session* :changelog-post-login)
+      (progn
+        (setf (lspf:session-property lspf:*session* :changelog-offset) 0
+              (lspf:session-property lspf:*session* :changelog-post-login) nil)
+        'main)
+      :stay))
+
 (lspf:define-key-handler changelog :pf3 ()
-  (setf (lspf:session-property lspf:*session* :changelog-offset) 0)
-  :back)
+  (if (lspf:session-property lspf:*session* :changelog-post-login)
+      :stay
+      (progn
+        (setf (lspf:session-property lspf:*session* :changelog-offset) 0)
+        :back)))
 
 (lspf:define-key-handler changelog :pf5 ()
   (let ((user (session-user lspf:*session*)))

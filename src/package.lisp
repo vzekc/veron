@@ -9,4 +9,5 @@
                     (#:editor #:lispf-editor)
                     (#:dex #:dexador))
   (:export #:start
-            #:start-from-env))
+            #:start-from-env
+            #:reload))

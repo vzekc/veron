@@ -274,3 +274,29 @@ Recognized variables (all optional, defaults in parentheses):
            :key-file key
            :key-password key-pw
            :starttls starttls)))
+
+
+(defun reload ()
+  "Hot-reload VERON code, run migrations, and refresh caches.
+Called via Swank during deployment. Existing sessions continue running."
+  (format t "~&;;; VERON: hot-reload starting~%")
+  (dolist (sys '(:veron :lispf :lispf-edit :woltlab-login))
+    (asdf:clear-system sys))
+  (format t "~&;;; VERON: reloading code~%")
+  (funcall (find-symbol "QUICKLOAD" :ql) :veron)
+  ;; After quickload, reload-post-code is the new version
+  (reload-post-code)
+  (format t "~&;;; VERON: hot-reload complete~%")
+  :ok)
+
+(defun reload-post-code ()
+  "Post-code-reload steps: migrations, chat, screen cache, menus."
+  (format t "~&;;; VERON: running migrations~%")
+  (initialize-db)
+  (format t "~&;;; VERON: reloading chat from DB~%")
+  (bt:with-lock-held (*chat-lock*)
+    (load-chat-from-db))
+  (format t "~&;;; VERON: refreshing screens and menus~%")
+  (let ((lspf:*application* *veron-app*))
+    (lspf:reload-all-screens)
+    (lspf:load-application-menus *veron-app*)))

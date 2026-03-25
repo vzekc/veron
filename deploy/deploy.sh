@@ -1,24 +1,28 @@
 #!/bin/bash
 #
-# Deploy VERON: pull latest code and restart the service.
+# Deploy VERON: pull latest code and hot-reload via Swank.
 # Run as the veron user (e.g. via SSH forced command).
+#
+# Requires: SWANK_PORT, VERON_PORT in /etc/veron/env
+# Optional: VERON_HOST, VERON_TLS_PORT
 #
 set -euo pipefail
 
 VERON_DIR=/opt/veron
 
+# Source environment (SWANK_PORT, VERON_PORT, VERON_HOST, etc.)
+set -a
+source /etc/veron/env
+set +a
+
 echo "=== Pulling latest code ==="
 cd "$VERON_DIR"
 git pull --recurse-submodules
 
-echo "=== Restarting service ==="
-sudo /usr/bin/systemctl restart veron
+echo "=== Hot-reloading via Swank (port ${SWANK_PORT}) ==="
+SWANK_EVAL='(veron:reload)' \
+  sbcl --noinform --non-interactive --no-userinit --no-sysinit \
+    --load deploy/swank-eval.lisp
 
-echo "=== Waiting for service to start ==="
-sleep 2
-if systemctl is-active --quiet veron; then
-    echo "VERON is running"
-else
-    echo "VERON failed to start, check: journalctl -u veron"
-    exit 1
-fi
+echo "=== Running confidence test ==="
+deploy/confidence-test.sh

@@ -84,6 +84,27 @@ Creates a test user with USERNAME/PASSWORD and binds SESSION-VAR to the s3270 se
        (with-test-app (,session-var veron::*veron-app*)
          ,@body))))
 
+;;; Screen observation
+
+(defun wait-for-screen-match (session predicate &key (timeout 5.0) (interval 0.1))
+  "Poll the screen until PREDICATE returns true for the full screen text.
+PREDICATE receives a single string (all rows joined with newlines).
+Returns T if matched, NIL if timed out."
+  (let ((deadline (+ (get-internal-real-time)
+                     (* timeout internal-time-units-per-second))))
+    (loop
+      (let* ((rows (screen-text session))
+             (full (format nil "~{~A~^~%~}" rows)))
+        (when (funcall predicate full)
+          (return t)))
+      (when (> (get-internal-real-time) deadline)
+        (return nil))
+      (bt:thread-yield))))
+
+(defun wait-for-screen-contains (session text &key (timeout 5.0))
+  "Wait until the screen contains TEXT. Returns T or NIL on timeout."
+  (wait-for-screen-match session (lambda (full) (search text full)) :timeout timeout))
+
 ;;; Helpers
 
 (defun login (session username password)

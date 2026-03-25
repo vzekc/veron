@@ -76,42 +76,23 @@
 
 ;;; Verify that the chat divider line shows current users and updates dynamically.
 
-(defun wait-for-divider (session expected-names &key (timeout 2.0) (interval 0.1))
-  "Wait until the chat divider line contains all EXPECTED-NAMES.
-Polls at INTERVAL seconds, gives up after TIMEOUT seconds."
-  (let ((deadline (+ (get-internal-real-time)
-                     (* timeout internal-time-units-per-second))))
-    (loop
-      ;; Trigger a screen refresh by pressing enter with empty input
-      (press-enter session)
-      (let* ((rows (screen-text session))
-             (full (format nil "~{~A~^~%~}" rows)))
-        (when (every (lambda (name) (search name full)) expected-names)
-          (return t)))
-      (when (> (get-internal-real-time) deadline)
-        (return nil))
-      (sleep interval))))
+(defun wait-for-divider (session expected-names &key (timeout 5.0))
+  "Wait until the chat divider line contains all EXPECTED-NAMES."
+  (wait-for-screen-match session
+    (lambda (full) (every (lambda (name) (search name full)) expected-names))
+    :timeout timeout))
 
-(defun wait-for-divider-without (session excluded-names &key (timeout 2.0) (interval 0.1))
-  "Wait until the chat divider line does NOT contain any of EXCLUDED-NAMES.
-Polls at INTERVAL seconds, gives up after TIMEOUT seconds."
-  (let ((deadline (+ (get-internal-real-time)
-                     (* timeout internal-time-units-per-second))))
-    (loop
-      (press-enter session)
-      (let* ((rows (screen-text session))
-             (full (format nil "~{~A~^~%~}" rows)))
-        (when (notany (lambda (name)
-                        (search (concatenate 'string " " name ",") full))
-                      excluded-names)
-          ;; Also check without comma (last/only name before " ---")
-          (when (notany (lambda (name)
-                          (search (concatenate 'string " " name " ---") full))
-                        excluded-names)
-            (return t))))
-      (when (> (get-internal-real-time) deadline)
-        (return nil))
-      (sleep interval))))
+(defun wait-for-divider-without (session excluded-names &key (timeout 5.0))
+  "Wait until the chat divider line does NOT contain any of EXCLUDED-NAMES."
+  (wait-for-screen-match session
+    (lambda (full)
+      (and (notany (lambda (name)
+                     (search (concatenate 'string " " name ",") full))
+                   excluded-names)
+           (notany (lambda (name)
+                     (search (concatenate 'string " " name " ---") full))
+                   excluded-names)))
+    :timeout timeout))
 
 (define-test e2e-chat-divider-shows-users ()
   (with-veron-app (s1 :username "hans" :password "hans")

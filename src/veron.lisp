@@ -36,6 +36,13 @@
                      (asdf:system-source-directory :veron))
   :session-class 'veron-session)
 
+;;; Session cleanup - called for all disconnection paths
+
+(defmethod lspf:session-cleanup ((app (eql *veron-app*)) session)
+  (let ((login-id (session-login-id session)))
+    (when login-id
+      (record-logout login-id))))
+
 ;;; Application customization
 
 (defmethod lspf:unknown-key-message ((app (eql *veron-app*)) key-name)
@@ -120,7 +127,6 @@
 
 (lspf:define-key-handler logout :pf5 ()
   (let ((user (session-user lspf:*session*)))
-    (record-logout (session-login-id lspf:*session*))
     (when user
       (notify :logout "Abmeldung"
               (format nil "~A hat sich abgemeldet" (user-username user)))))

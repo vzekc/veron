@@ -18,7 +18,7 @@
 
                    V.z.E.k.C. Electronic Retro Online Network
 
-        Vielen Dank fuer Ihren Besuch. Bis zum naechsten Mal!
+              Vielen Dank fuer Deinen Besuch. Bis zum naechsten Mal!
 "
  :fields ((:from (16 18) :len 43 :intense t :color pink)
           (:from (18 8) :len 55 :intense t :color turquoise))

@@ -223,7 +223,7 @@ Text files are read as strings and encoded. Binary files are read as raw bytes."
 (defun ensure-changelog-file ()
   "Ensure the global changelog file exists. Returns its ID."
   (or (changelog-file-id)
-      (create-file "Changelog" nil)))
+      (create-file "Changelog" :null)))
 
 (defun load-changelog-text ()
   "Return the changelog content as a string."

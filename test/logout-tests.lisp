@@ -15,29 +15,31 @@
 ;;; Normal logout via PF3 + PF5 should record logout time.
 
 (define-test e2e-logout-normal-records-time ()
-  (with-veron-app (s :username "loguser" :password "logpass")
-    (login s "loguser" "logpass")
-    ;; Logout normally: PF3 to logout screen, PF5 to confirm
-    (press-key s :pf3)
-    (assert-on-screen s "LOGOUT")
-    (press-key s :pf5)
-    ;; Goodbye screen is displayed; press PF3 to disconnect cleanly
-    (wait-for-field s)
-    (press-key s :pf3))
-  ;; with-test-app waits for session drain; check logout was recorded
-  (assert (last-login-has-logout-p) ()
-          "Normal logout should record logout_at"))
+  (with-test-db (db-name)
+    (create-test-user "loguser" "logpass")
+    (veron::load-chat-from-db)
+    (with-test-app (s veron::*veron-app*)
+      (login s "loguser" "logpass")
+      (press-key s :pf3)
+      (assert-on-screen s "LOGOUT")
+      (press-key s :pf5)
+      ;; Disconnect client from goodbye screen
+      (ignore-errors (s3270-disconnect s))
+      (ignore-errors (close-s3270 s)))
+    ;; Session has drained; test DB still alive - check logout was recorded
+    (assert (last-login-has-logout-p) ()
+            "Normal logout should record logout_at")))
 
 ;;; Connection drop (client disconnect) should also record logout time.
 
 (define-test e2e-logout-connection-drop-records-time ()
-  (with-veron-app (s :username "dropuser" :password "droppass")
-    (login s "dropuser" "droppass")
-    ;; Forcibly disconnect without logging out
-    (s3270-disconnect s)
-    (close-s3270 s)
-    ;; Wait for session thread to finish cleanup
-    (sleep 0.5)
-    ;; Check the login record has a logout timestamp
+  (with-test-db (db-name)
+    (create-test-user "dropuser" "droppass")
+    (veron::load-chat-from-db)
+    (with-test-app (s veron::*veron-app*)
+      (login s "dropuser" "droppass")
+      (s3270-disconnect s)
+      (close-s3270 s))
+    ;; Session has drained; test DB still alive - check logout was recorded
     (assert (last-login-has-logout-p) ()
             "Connection drop should record logout_at")))

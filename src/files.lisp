@@ -209,3 +209,29 @@ Text files are read as strings and encoded. Binary files are read as raw bytes."
   (let ((path (file-tmp-path file-id)))
     (when (probe-file path)
       (delete-file path))))
+
+;;; Changelog file
+
+(defun changelog-file-id ()
+  "Return the changelog file ID, or NIL."
+  (with-db
+    (let ((result (pomo:query
+                   "SELECT id FROM files WHERE name = 'Changelog' AND owner_id IS NULL"
+                   :single)))
+      (unless (db-null-p result) result))))
+
+(defun ensure-changelog-file ()
+  "Ensure the global changelog file exists. Returns its ID."
+  (or (changelog-file-id)
+      (create-file "Changelog" nil)))
+
+(defun load-changelog-text ()
+  "Return the changelog content as a string."
+  (let* ((file-id (ensure-changelog-file))
+         (record (load-file-record file-id)))
+    (or (getf record :content) "")))
+
+(defun save-changelog-text (content)
+  "Save changelog text content."
+  (let ((file-id (ensure-changelog-file)))
+    (save-file-content file-id content (text-mime-type))))

@@ -137,7 +137,7 @@ Returns 'main on success. Signals application-error on failure."
     (unless result
       (lspf:application-error "Ungueltiges Passwort"))
     (complete-login result)
-    'main))
+    (post-login-screen)))
 
 ;;; Common login completion
 
@@ -147,7 +147,9 @@ Returns 'main on success. Signals application-error on failure."
     (setf (session-user lspf:*session*) user)
     (ensure-db-user user)
     (setf (session-login-id lspf:*session*)
-          (record-login user :terminal-type (session-term-type lspf:*session*)))
+          (record-login user
+                        :terminal-type (session-term-type lspf:*session*)
+                        :tls (lspf:session-tls-p lspf:*session*)))
     (notify :login "Anmeldung"
             (format nil "~A hat sich angemeldet" (user-username user)))
     (update-my-chat-indicator)))

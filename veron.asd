@@ -16,6 +16,7 @@
                              (:file "who-screen")
                              (:file "guestbook-screen")
                              (:file "chat-screen")
+                             (:file "changelog-screen")
                              (:file "veron"))))
   :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern #:dexador #:ironclad #:swank #:cl-smtp)
   :in-order-to ((asdf:test-op (asdf:test-op #:veron-test))))

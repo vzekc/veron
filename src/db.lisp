@@ -76,16 +76,46 @@
    (ironclad:digest-sequence :sha256
                              (ironclad:ascii-string-to-byte-array password))))
 
+(defun generate-password (&optional (length 12))
+  "Generate a random alphanumeric password of LENGTH characters."
+  (let ((chars "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+        (bytes (ironclad:random-data length)))
+    (map 'string (lambda (b) (char chars (mod b (length chars)))) bytes)))
+
+(defun next-local-user-id ()
+  "Return the next available negative ID for local users."
+  (with-db
+    (let ((min-id (pomo:query "SELECT COALESCE(MIN(id), 0) FROM users WHERE id < 0" :single)))
+      (1- min-id))))
+
+(defun create-local-user (username email)
+  "Create a local-only user with USERNAME and EMAIL. Generates and prints a random password.
+Returns the new user object."
+  (let* ((password (generate-password))
+         (id (next-local-user-id))
+         (hashed (hash-password password)))
+    (with-db
+      (pomo:execute
+       "INSERT INTO users (id, name, email, local_password, last_login) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)"
+       id username email hashed))
+    (format t "Created local user ~A (ID ~D) with password: ~A~%" username id password)
+    (make-instance 'user
+                   :id id
+                   :username username
+                   :email email
+                   :groups nil
+                   :login-time (get-universal-time))))
+
 (defun authenticate-local (username password)
   "Try local password authentication. Returns a plist like woltlab-login on success, NIL otherwise."
   (with-db
     (let ((row (pomo:query
-                "SELECT id, name, local_password FROM users WHERE name = $1 AND local_password IS NOT NULL"
+                "SELECT id, name, local_password, email FROM users WHERE name = $1 AND local_password IS NOT NULL"
                 username :row)))
       (when (and row (string= (third row) (hash-password password)))
         (list :user-id (first row)
               :username (second row)
-              :email ""
+              :email (or (fourth row) "")
               :groups nil)))))
 
 (defun has-local-password-p (username)
@@ -132,11 +162,11 @@ MINUTES-AGO is how many minutes since the OTP was sent (based on 5min expiry win
       ON CONFLICT (id) DO UPDATE SET name = $2, last_login = CURRENT_TIMESTAMP"
      (user-id user) (user-username user))))
 
-(defun record-login (user &key terminal-type)
+(defun record-login (user &key terminal-type tls)
   (with-db
     (pomo:query
-     "INSERT INTO logins (user_id, terminal_type) VALUES ($1, $2) RETURNING id"
-     (user-id user) terminal-type :single)))
+     "INSERT INTO logins (user_id, terminal_type, tls) VALUES ($1, $2, $3) RETURNING id"
+     (user-id user) terminal-type tls :single)))
 
 (defun record-logout (login-id)
   (when login-id
@@ -212,7 +242,7 @@ Numeric values: -1 = CET (UTC+1), -2 = CEST (UTC+2), etc.")
 (defun login-log-entries (start count)
   (with-db
     (pomo:query
-     "SELECT u.name, l.login_at, l.logout_at, l.terminal_type
+     "SELECT u.name, l.login_at, l.logout_at, l.terminal_type, l.tls
       FROM logins l JOIN users u ON l.user_id = u.id
       ORDER BY l.login_at DESC LIMIT $1 OFFSET $2"
      count start :plists)))
@@ -220,6 +250,26 @@ Numeric values: -1 = CET (UTC+1), -2 = CEST (UTC+2), etc.")
 (defun login-log-count ()
   (with-db
     (pomo:query "SELECT COUNT(*) FROM logins" :single)))
+
+;;; Changelog read tracking
+
+(defun changelog-unread-p (user-id)
+  "Return T if the changelog has been modified since the user last read it."
+  (with-db
+    (pomo:query
+     "SELECT EXISTS(
+        SELECT 1 FROM files f, users u
+        WHERE f.name = 'Changelog' AND f.owner_id IS NULL
+          AND u.id = $1
+          AND (u.changelog_read_at IS NULL OR f.modified_at > u.changelog_read_at)
+          AND f.content != ''::bytea)"
+     user-id :single)))
+
+(defun mark-changelog-read (user-id)
+  "Mark the changelog as read by setting changelog_read_at to now."
+  (with-db
+    (pomo:execute "UPDATE users SET changelog_read_at = CURRENT_TIMESTAMP WHERE id = $1"
+                  user-id)))
 
 ;;; Chat persistence
 

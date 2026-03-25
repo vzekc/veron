@@ -10,4 +10,5 @@
                     (#:dex #:dexador))
   (:export #:start
             #:start-from-env
-            #:reload))
+            #:reload
+            #:create-local-user))

@@ -4,12 +4,13 @@
  :aliases ("log")
  :screen "
 
-     Benutzer         Anmeldung        Abmeldung        Terminal
+     Benutzer         Anmeldung        Abmeldung        Terminal        TLS
 "
  :fields ((:from (2 5) :len 16 :name name :color green :intense t :repeat 17)
           (:from (2 22) :len 16 :name login-at :color turquoise :repeat 17)
           (:from (2 39) :len 16 :name logout-at :color turquoise :repeat 17)
-          (:from (2 56) :len 23 :name terminal-type :repeat 17)
+          (:from (2 56) :len 19 :name terminal-type :repeat 17)
+          (:from (2 76) :len 3 :name tls :color turquoise :repeat 17)
           (:from (19 1) :len 30 :name page-info :color turquoise))
  :keys ((:pf3 "Zurueck" :back t)
         (:pf7 "Vor." :hidden t)

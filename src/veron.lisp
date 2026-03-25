@@ -124,7 +124,7 @@
          (unless result
            (lspf:application-error "Ungueltiger Benutzername oder Passwort"))
          (complete-login result)
-         'main))
+         (post-login-screen)))
       ;; Non-TLS: user has local password
       ((has-local-password-p username)
        (setf (session-otp-username lspf:*session*) username)
@@ -209,7 +209,7 @@
           (save-local-password (user-id user) new-password)
           (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
                 "Passwort gespeichert"))
-        'main)))
+        (post-login-screen))))
 
 (lspf:define-key-handler set-password-otp :pf3 ()
   'goodbye)
@@ -368,8 +368,91 @@
                                             (if ts (format-datetime ts) ""))
                                 :logout-at (let ((ts (getf e :logout-at)))
                                              (if ts (format-datetime ts) ""))
-                                :terminal-type (or (getf e :terminal-type) "")))
+                                :terminal-type (or (getf e :terminal-type) "")
+                                :tls (if (getf e :tls) "Ja" "")))
             total)))
+
+;;; Deployment logging
+
+(defvar *last-deploy-hash* nil
+  "Git commit hash of the last deployment, used to detect new deploys.")
+
+(defun git-short-hash ()
+  "Return the short git commit hash, or NIL."
+  (ignore-errors
+    (string-trim '(#\Newline #\Return #\Space)
+                 (uiop:run-program '("git" "rev-parse" "--short" "HEAD")
+                                   :output :string
+                                   :directory (asdf:system-source-directory :veron)))))
+
+(defun git-commit-titles-since (old-hash)
+  "Return a list of commit title strings from OLD-HASH to HEAD."
+  (ignore-errors
+    (let ((output (uiop:run-program
+                   (list "git" "log" "--pretty=format:%s"
+                         (format nil "~A..HEAD" old-hash))
+                   :output :string
+                   :directory (asdf:system-source-directory :veron))))
+      (when (and output (plusp (length output)))
+        (uiop:split-string output :separator '(#\Newline))))))
+
+(defun format-changelog-entry (titles)
+  "Format a changelog entry block with timestamp heading and indented titles."
+  (with-output-to-string (s)
+    (multiple-value-bind (sec min hour day month year)
+        (decode-display-time (get-universal-time))
+      (declare (ignore sec))
+      (format s "=== ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D ===~%"
+              day month year hour min))
+    (dolist (title titles)
+      (format s "    ~A~%" title))
+    (terpri s)))
+
+(defun append-changelog-deployment ()
+  "If there are new commits since last deploy, prepend a changelog entry.
+Returns T if an entry was added."
+  (let ((current-hash (git-short-hash)))
+    (unless current-hash
+      (return-from append-changelog-deployment nil))
+    (when (and *last-deploy-hash*
+               (string= current-hash *last-deploy-hash*))
+      (return-from append-changelog-deployment nil))
+    (let ((titles (if *last-deploy-hash*
+                      (git-commit-titles-since *last-deploy-hash*)
+                      (ignore-errors
+                        (let ((output (uiop:run-program
+                                       '("git" "log" "-1" "--pretty=format:%s")
+                                       :output :string
+                                       :directory (asdf:system-source-directory :veron))))
+                          (when (and output (plusp (length output)))
+                            (list (string-trim '(#\Newline #\Return #\Space) output))))))))
+      (when titles
+        (let* ((new-block (format-changelog-entry titles))
+               (existing (load-changelog-text))
+               (combined (concatenate 'string new-block existing)))
+          (save-changelog-text combined))))
+    (setf *last-deploy-hash* current-hash)
+    t))
+
+(defun log-deployment ()
+  "Log a deployment to console and LISPF log, and update the changelog."
+  (let ((hash (git-short-hash)))
+    (format t "~&;;; VERON: deployed ~A~%" (or hash "unknown"))
+    (lspf:log-message :info "Deployed ~A" (or hash "unknown")))
+  (ensure-changelog-file)
+  (when (append-changelog-deployment)
+    (format t "~&;;; VERON: changelog updated~%")
+    (lspf:log-message :info "Changelog updated")))
+
+;;; Login redirect
+
+(defun post-login-screen ()
+  "Return the screen to navigate to after login.
+If the changelog has unread entries, go to changelog; otherwise main."
+  (let ((user (session-user lspf:*session*)))
+    (if (and user (changelog-unread-p (user-id user)))
+        'changelog
+        'main)))
 
 ;;; Server entry point
 
@@ -381,6 +464,7 @@ TLS-PORT enables a dedicated TLS listener. STARTTLS (default T) offers
 STARTTLS negotiation on the plain port."
   (initialize-db)
   (load-chat-from-db)
+  (log-deployment)
   (lspf:start-application *veron-app* :port port :host host
                            :tls-port tls-port
                            :certificate-file certificate-file
@@ -450,4 +534,5 @@ Called via Swank during deployment. Existing sessions continue running."
   (format t "~&;;; VERON: refreshing screens and menus~%")
   (let ((lspf:*application* *veron-app*))
     (lspf:reload-all-screens)
-    (lspf:load-application-menus *veron-app*)))
+    (lspf:load-application-menus *veron-app*))
+  (log-deployment))

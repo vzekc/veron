@@ -317,9 +317,10 @@ confirmation message to avoid revealing whether the account exists."
 (lispf:define-key-handler set-password :pf3 ()
   :back)
 
-;;; Main screen
+;;; Logout
 
-(lispf:define-key-handler main :pf3 ()
+(defun confirm-logout ()
+  "Show confirmation dialog and log out if confirmed."
   (lispf:request-confirmation
    "Wirklich abmelden?"
    (lambda ()
@@ -328,6 +329,19 @@ confirmation message to avoid revealing whether the account exists."
          (notify :logout "Abmeldung"
                  (format nil "~A hat sich abgemeldet" (user-username user)))))
      'goodbye)))
+
+(defvar *logout-commands* '("logout" "logoff" "exit" "bye" "ende" "quit")
+  "Commands that trigger the logout confirmation dialog.")
+
+(defmethod lispf:process-command ((app (eql *veron-app*)) (command string))
+  (if (member command *logout-commands* :test #'string-equal)
+      (confirm-logout)
+      (call-next-method)))
+
+;;; Main screen
+
+(lispf:define-key-handler main :pf3 ()
+  (confirm-logout))
 
 ;;; Goodbye screen - display for 5 seconds, then disconnect
 

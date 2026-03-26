@@ -32,6 +32,44 @@
     (assert (last-login-has-logout-p) ()
             "Normal logout should record logout_at")))
 
+;;; Logout command from command field triggers confirmation
+
+(define-test e2e-logout-command ()
+  (with-veron-app (s :username "cmdloguser" :password "cmdlogpass")
+    (login s "cmdloguser" "cmdlogpass")
+    (assert-on-screen s "MAIN")
+    ;; Type "logout" in the command field
+    (move-cursor s 21 14)
+    (erase-eof s)
+    (type-text s "logout")
+    (press-enter s)
+    ;; Should show confirmation
+    (assert-on-screen s "MAIN")
+    (assert-screen-contains s "Wirklich abmelden?")
+    ;; Confirm
+    (press-key s :pf5)
+    (assert-on-screen s "GOODBYE")))
+
+;;; Logout command works from a submenu screen
+
+(define-test e2e-logout-command-from-submenu ()
+  (with-veron-app (s :username "subloguser" :password "sublogpass")
+    (login s "subloguser" "sublogpass")
+    (assert-on-screen s "MAIN")
+    ;; Navigate to a submenu (guestbook)
+    (navigate-to s "guestbook")
+    (assert-on-screen s "GUESTBOOK")
+    ;; Type "quit" in the command field
+    (move-cursor s 21 14)
+    (erase-eof s)
+    (type-text s "quit")
+    (press-enter s)
+    ;; Should show confirmation
+    (assert-screen-contains s "Wirklich abmelden?")
+    ;; Confirm
+    (press-key s :pf5)
+    (assert-on-screen s "GOODBYE")))
+
 ;;; Connection drop (client disconnect) should also record logout time.
 
 (define-test e2e-logout-connection-drop-records-time ()

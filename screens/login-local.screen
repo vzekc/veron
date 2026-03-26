@@ -10,5 +10,5 @@
  :fields ((:from (18 19) :len 21 :name username)
           (:from (19 19) :len 60 :name password :write t :hidden t :transient t))
  :keys ((:enter "Login")
-        (:pf3 "Zurueck")
-        (:pf5 "Passwort vergessen")))
+        (:pf2 "Passwort vergessen")
+        (:pf3 "Zurueck")))

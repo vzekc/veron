@@ -26,7 +26,8 @@
    (login-id :initform nil :accessor session-login-id)
    (otp-username :initform nil :accessor session-otp-username)
    (otp-email-masked :initform nil :accessor session-otp-email-masked)
-   (otp-attempts :initform 0 :accessor session-otp-attempts)))
+   (otp-attempts :initform 0 :accessor session-otp-attempts)
+   (password-reset-sent :initform nil :accessor session-password-reset-sent)))
 
 ;;; Application definition
 
@@ -135,7 +136,8 @@
   (setf password "")
   (cond
     ((lispf:session-tls-p lispf:*session*)
-     (setf password-label "Passwort:"))
+     (setf password-label "Passwort:")
+     (lispf:show-key :pf2 "Passwort vergessen"))
     (t
      (setf password-label "")
      (lispf:set-field-attribute "password" :write nil)
@@ -180,6 +182,25 @@
       (t
        (lispf:application-error "Benutzer nicht gefunden")))))
 
+(defun initiate-password-reset (username)
+  "Initiate a password reset for USERNAME. Enforces one reset per session.
+Sends an OTP email if the account exists, but always shows the same
+confirmation message to avoid revealing whether the account exists."
+  (let ((session lispf:*session*))
+    (when (session-password-reset-sent session)
+      (lispf:application-error "Passwort-Reset bereits angefordert"))
+    (setf (session-password-reset-sent session) t
+          (session-otp-username session) username)
+    (let ((email (lookup-woltlab-email username)))
+      (when email
+        (ignore-errors (prepare-otp-login username))))
+    'login-otp))
+
+(lispf:define-key-handler login :pf2 (username)
+  (when (string= username "")
+    (lispf:application-error "Bitte Benutzername eingeben"))
+  (initiate-password-reset username))
+
 (lispf:define-key-handler login :pf3 ()
   :logoff)
 
@@ -195,12 +216,8 @@
 (lispf:define-key-handler login-local :pf3 ()
   'login)
 
-(lispf:define-key-handler login-local :pf5 ()
-  (let ((username (session-otp-username lispf:*session*)))
-    (unless (lookup-woltlab-email username)
-      (lispf:application-error "Passwort-Reset nicht moeglich"))
-    (prepare-otp-login username)
-    'login-otp))
+(lispf:define-key-handler login-local :pf2 ()
+  (initiate-password-reset (session-otp-username lispf:*session*)))
 
 ;;; Login with OTP screen
 
@@ -210,13 +227,15 @@
           otp-code "")
     (when (not (gethash "errormsg" (lispf:session-context session)))
       (lispf:set-field-attribute "errormsg" :color cl3270:+yellow+)
-      (let ((minutes-ago (lispf:session-property session :otp-minutes-ago))
-            (email (or (session-otp-email-masked session) "")))
-        (setf (gethash "errormsg" (lispf:session-context session))
-              (if minutes-ago
-                  (format nil "Einmalpasswort gesendet vor ~D Min. an: ~A"
-                          minutes-ago email)
-                  (format nil "Einmalpasswort gesendet an: ~A" email)))))))
+      (setf (gethash "errormsg" (lispf:session-context session))
+            (if (session-password-reset-sent session)
+                "Falls ein Konto existiert, wurde eine E-Mail gesendet"
+                (let ((minutes-ago (lispf:session-property session :otp-minutes-ago))
+                      (email (or (session-otp-email-masked session) "")))
+                  (if minutes-ago
+                      (format nil "Einmalpasswort gesendet vor ~D Min. an: ~A"
+                              minutes-ago email)
+                      (format nil "Einmalpasswort gesendet an: ~A" email))))))))
 
 (lispf:define-key-handler login-otp :enter (otp-code)
   (verify-otp (session-otp-username lispf:*session*) otp-code))

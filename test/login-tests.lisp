@@ -45,6 +45,67 @@
          (assert-cursor-at s 20 19 :description "Cursor at start of password field"))
     (setf (lispf:application-test-force-tls veron::*veron-app*) nil)))
 
+;;; Password reset from TLS login screen: no username → error
+
+(define-test e2e-login-pf2-no-username ()
+  (setf (lispf:application-test-force-tls veron::*veron-app*) t)
+  (unwind-protect
+       (with-veron-app (s :username "testuser" :password "testpass")
+         (assert-on-screen s "LOGIN")
+         (press-pf s 2)
+         ;; Should stay on login with error
+         (assert-on-screen s "LOGIN")
+         (assert-screen-contains s "Bitte Benutzername eingeben"))
+    (setf (lispf:application-test-force-tls veron::*veron-app*) nil)))
+
+;;; Password reset from TLS login screen: with username → generic message
+
+(define-test e2e-login-pf2-with-username ()
+  (setf (lispf:application-test-force-tls veron::*veron-app*) t)
+  (unwind-protect
+       (with-veron-app (s :username "testuser" :password "testpass")
+         (assert-on-screen s "LOGIN")
+         (type-text s "testuser")
+         (press-pf s 2)
+         (assert-on-screen s "LOGIN-OTP")
+         ;; Must show generic message, not the masked email
+         (assert-screen-contains s "Falls ein Konto existiert"))
+    (setf (lispf:application-test-force-tls veron::*veron-app*) nil)))
+
+;;; Password reset from login-local: PF2 → generic message
+
+(define-test e2e-login-local-pf2-reset ()
+  (with-veron-app (s :username "resetuser" :password "testpass")
+    (assert-on-screen s "LOGIN")
+    (type-text s "resetuser")
+    (press-enter s)
+    (assert-on-screen s "LOGIN-LOCAL")
+    (press-pf s 2)
+    (assert-on-screen s "LOGIN-OTP")
+    (assert-screen-contains s "Falls ein Konto existiert")))
+
+;;; Only one password reset per session
+
+(define-test e2e-login-pf2-only-once ()
+  (with-veron-app (s :username "onceuser" :password "testpass")
+    (assert-on-screen s "LOGIN")
+    (type-text s "onceuser")
+    (press-enter s)
+    (assert-on-screen s "LOGIN-LOCAL")
+    ;; First reset
+    (press-pf s 2)
+    (assert-on-screen s "LOGIN-OTP")
+    ;; Go back and try again
+    (press-pf s 3)
+    (assert-on-screen s "LOGIN")
+    (type-text s "onceuser")
+    (press-enter s)
+    (assert-on-screen s "LOGIN-LOCAL")
+    (press-pf s 2)
+    ;; Should get "already requested" error
+    (assert-on-screen s "LOGIN-LOCAL")
+    (assert-screen-contains s "bereits angefordert")))
+
 ;;; Password field cleared after failed login attempt
 ;;; A long wrong password followed by a shorter correct password must work.
 ;;; Without clearing, remnants of the long password would corrupt the short one.

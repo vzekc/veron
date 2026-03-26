@@ -17,7 +17,9 @@ set +a
 
 echo "=== Pulling latest code ==="
 cd "$VERON_DIR"
-git pull --recurse-submodules
+git fetch origin
+git reset --hard origin/main
+git submodule update --init --recursive
 
 echo "=== Hot-reloading via Swank (port ${SWANK_PORT}) ==="
 SWANK_EVAL='(veron:reload)' \

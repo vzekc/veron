@@ -11,11 +11,11 @@
    Letzte Anmeldung:
    Benutzer-ID:
 "
- :fields ((:from (3 20) :len 30 :name username)
-          (:from (4 20) :len 50 :name email :write t)
-          (:from (5 20) :len 1 :name admin :write t :highlighting underscore)
-          (:from (7 20) :len 20 :name last-login :color turquoise)
-          (:from (8 20) :len 10 :name user-id :color turquoise))
+ :fields ((:from (3 22) :len 30 :name username)
+          (:from (4 22) :len 50 :name email :write t)
+          (:from (5 22) :len 1 :name admin :write t :highlighting underscore)
+          (:from (7 22) :len 20 :name last-login :color turquoise)
+          (:from (8 22) :len 10 :name user-id :color turquoise))
  :keys ((:pf3 "Zurueck" :back t)
         (:pf5 "Speichern")
         (:pf6 "Passwort")

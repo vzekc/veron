@@ -1,12 +1,11 @@
 (:name "changelog"
  :title "Letzte Aenderungen"
  :navigable t
- :command t
  :aliases ("news" "cl")
  :screen "
 "
- :fields ((:from (18 1) :len 40 :name page-info :color turquoise))
- :dynamic-areas ((:name content :from (0 0) :to (17 79)))
+ :fields ((:from (20 1) :len 40 :name page-info :color turquoise))
+ :dynamic-areas ((:name content :from (0 0) :to (19 79)))
  :keys ((:enter "Weiter" :hidden t)
         (:pf3 "Zurueck" :hidden t)
         (:pf5 "Bearbeiten" :hidden t)

@@ -362,12 +362,35 @@ confirmation message to avoid revealing whether the account exists."
 (lispf:define-key-handler about :pf3 ()
   :back)
 
-;;; Notizen (editor demo)
+;;; Editor settings persistence
+
+(defun apply-editor-settings ()
+  "Load editor settings from DB and apply to the current session."
+  (let* ((session lispf:*session*)
+         (user (session-user session)))
+    (when user
+      (let ((settings (load-editor-settings (user-id user))))
+        (when settings
+          (when (getf settings :autoinsert nil)
+            (setf (lispf-editor:editor-auto-insert-p session)
+                  (getf settings :autoinsert)))
+          (when (member :verbose settings)
+            (setf (lispf-editor:editor-verbose-p session)
+                  (getf settings :verbose))))
+        (setf (lispf:session-property session :save-editor-settings)
+              (lambda ()
+                (save-editor-settings
+                 (user-id user)
+                 (list :autoinsert (lispf-editor:editor-auto-insert-p session)
+                       :verbose (lispf-editor:editor-verbose-p session)))))))))
+
+;;; Notizen (editor)
 
 (lispf:define-screen-update notes ()
   (let* ((user (session-user lispf:*session*))
          (file-id (ensure-notes-file user))
          (path (file-to-disk file-id)))
+    (apply-editor-settings)
     (lispf-editor:edit-file path :display-name "Notizen")
     (disk-to-file file-id)
     (cleanup-tmp-file file-id)

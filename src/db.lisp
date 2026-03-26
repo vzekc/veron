@@ -218,6 +218,20 @@ MINUTES-AGO is how many minutes since the OTP was sent (based on 5min expiry win
        "UPDATE users SET roles = array_remove(roles, $1) WHERE id = $2"
        role-string user-id))))
 
+(defun load-editor-settings (user-id)
+  "Load editor settings plist for USER-ID from the database."
+  (with-db
+    (let ((result (pomo:query "SELECT editor_settings FROM users WHERE id = $1"
+                              user-id :single)))
+      (when (and result (not (db-null-p result)) (plusp (length result)))
+        (ignore-errors (read-from-string result))))))
+
+(defun save-editor-settings (user-id settings)
+  "Save editor SETTINGS plist for USER-ID to the database."
+  (with-db
+    (pomo:execute "UPDATE users SET editor_settings = $1 WHERE id = $2"
+                  (prin1-to-string settings) user-id)))
+
 (defun ensure-db-user (user)
   (with-db
     (pomo:execute

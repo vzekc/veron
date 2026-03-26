@@ -46,6 +46,7 @@
     (when (< (+ offset +changelog-display-lines+) total)
       (lspf:show-key :pf8 "Naech."))
     (when (and user (admin-p user))
+      (lspf:show-key :pf4 "Bearbeiten")
       (lspf:show-key :pf5 "Neu"))))
 
 ;;; Dynamic area updater
@@ -106,17 +107,23 @@
               username day month year hour min))
     (dotimes (i 3) (terpri s))))
 
-(lspf:define-key-handler changelog :pf5 ()
-  (let ((user (session-user lspf:*session*)))
-    (unless (admin-p user)
-      (lspf:application-error "Keine Berechtigung"))
-    (let* ((file-id (ensure-changelog-file))
-           (heading (format-manual-changelog-heading (user-username user)))
-           (existing (load-changelog-text)))
-      (save-changelog-text (concatenate 'string heading existing))
-      (let ((path (file-to-disk file-id)))
-        (editor:edit-file path :display-name "Changelog")
-        (disk-to-file file-id)
-        (cleanup-tmp-file file-id))
-      (setf (lspf:session-property lspf:*session* :changelog-offset) 0)))
+(defun edit-changelog (&optional prepend)
+  "Open the changelog in the editor. If PREPEND is non-nil, prepend it first."
+  (unless (admin-p (session-user lspf:*session*))
+    (lspf:application-error "Keine Berechtigung"))
+  (let ((file-id (ensure-changelog-file)))
+    (when prepend
+      (save-changelog-text (concatenate 'string prepend (load-changelog-text))))
+    (let ((path (file-to-disk file-id)))
+      (editor:edit-file path :display-name "Changelog")
+      (disk-to-file file-id)
+      (cleanup-tmp-file file-id))
+    (setf (lspf:session-property lspf:*session* :changelog-offset) 0))
   :stay)
+
+(lspf:define-key-handler changelog :pf4 ()
+  (edit-changelog))
+
+(lspf:define-key-handler changelog :pf5 ()
+  (edit-changelog (format-manual-changelog-heading
+                   (user-username (session-user lspf:*session*)))))

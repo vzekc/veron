@@ -8,6 +8,7 @@
  :dynamic-areas ((:name content :from (0 0) :to (19 79)))
  :keys ((:enter "Weiter" :hidden t)
         (:pf3 "Zurueck" :hidden t)
-        (:pf5 "Bearbeiten" :hidden t)
+        (:pf4 "Bearbeiten" :hidden t)
+        (:pf5 "Neu" :hidden t)
         (:pf7 "Vor." :hidden t)
         (:pf8 "Naech." :hidden t)))

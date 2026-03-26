@@ -156,12 +156,14 @@ If redirected to the changelog screen, press Enter to reach MAIN."
   (assert-on-screen session "MAIN"))
 
 (defun navigate-to (session screen-name)
-  "Navigate to SCREEN-NAME via the command field."
+  "Navigate to SCREEN-NAME via the command field.
+Waits for the target screen to appear (handles background update races)."
   (move-cursor session 21 14)
   (erase-eof session)
   (type-text session (string-downcase screen-name))
   (press-enter session)
-  (assert-on-screen session screen-name))
+  (unless (wait-for-screen-contains session (string-upcase screen-name) :timeout 3.0)
+    (assert-on-screen session screen-name)))
 
 ;;; Additional sessions
 

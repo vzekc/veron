@@ -44,6 +44,21 @@
     (assert (wait-for-screen-contains s "Abmelden" :timeout 2)
             () "Normal PF3 label should be restored after cancel")))
 
+;;; Confirmation key labels are left-aligned
+
+(define-test e2e-confirmation-keys-left-aligned ()
+  (with-veron-app (s :username "alignuser" :password "alignpass")
+    (login s "alignuser" "alignpass")
+    (assert-on-screen s "MAIN")
+    (press-key s :pf3)
+    (assert (wait-for-screen-contains s "Wirklich abmelden?" :timeout 2))
+    ;; Row 23 (0-based) should have key labels starting near column 1
+    (let ((key-row (screen-row s 23)))
+      (assert (and (>= (length key-row) 5)
+                   (string= "PF3" (string-trim '(#\Space) (subseq key-row 0 4))))
+              () "PF3 label should start at left of row 23, got: ~S"
+              (subseq key-row 0 (min 40 (length key-row)))))))
+
 ;;; Other keys during confirmation are ignored
 
 (define-test e2e-confirmation-other-key-ignored ()

@@ -102,8 +102,8 @@
     (multiple-value-bind (sec min hour day month year)
         (decode-display-time (get-universal-time))
       (declare (ignore sec))
-      (format s "=== ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D (~A) ===~%"
-              day month year hour min username))
+      (format s "=== Eintrag von ~A, ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D ===~%"
+              username day month year hour min))
     (dotimes (i 3) (terpri s))))
 
 (lspf:define-key-handler changelog :pf5 ()

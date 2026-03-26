@@ -443,8 +443,8 @@
     (multiple-value-bind (sec min hour day month year)
         (decode-display-time (get-universal-time))
       (declare (ignore sec))
-      (format s "=== ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D (~A) ===~%"
-              day month year hour min hash))
+      (format s "=== Deployment, git hash ~A, ~2,'0D.~2,'0D.~4D ~2,'0D:~2,'0D ===~%"
+              hash day month year hour min))
     (dolist (title titles)
       (format s "    ~A~%" title))
     (terpri s)))
@@ -452,7 +452,8 @@
 (defun changelog-contains-hash-p (hash)
   "Return T if the changelog already contains an entry for HASH."
   (let ((text (load-changelog-text)))
-    (search (format nil "(~A)" hash) text)))
+    (or (search (format nil "git hash ~A" hash) text)
+        (search (format nil "(~A)" hash) text))))
 
 (defun append-changelog-deployment ()
   "If there are new commits since last deploy, prepend a changelog entry.

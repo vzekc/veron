@@ -111,8 +111,7 @@
                   (let ((buf (ensure-channel-buffer channel-id)))
                     (vector-push-extend msg buf))
                   (setf *chat-id-counter* (max *chat-id-counter* db-id))))))))
-      (format t "~&;;; VERON: closed ~D orphaned session~:P~%" (length users))
-      (lspf:log-message :info "Closed ~D orphaned session~:P" (length users)))))
+      (lspf:log-message :info "closed ~D orphaned session~:P" (length users)))))
 
 ;;; Utility
 
@@ -482,14 +481,12 @@ Returns T if an entry was added."
     t))
 
 (defun log-deployment ()
-  "Log a deployment to console and LISPF log, and update the changelog."
+  "Log a deployment and update the changelog."
   (let ((hash (git-short-hash)))
-    (format t "~&;;; VERON: deployed ~A~%" (or hash "unknown"))
-    (lspf:log-message :info "Deployed ~A" (or hash "unknown")))
+    (lspf:log-message :info "deployed ~A" (or hash "unknown")))
   (ensure-changelog-file)
   (when (append-changelog-deployment)
-    (format t "~&;;; VERON: changelog updated~%")
-    (lspf:log-message :info "Changelog updated")))
+    (lspf:log-message :info "changelog updated")))
 
 ;;; Login redirect
 
@@ -505,16 +502,28 @@ If the changelog has unread entries, go to changelog; otherwise main."
 
 ;;; Server entry point
 
+(defun deploy ()
+  "Run all deployment steps: migrations, chat, screens, orphan cleanup, changelog."
+  (lspf:log-message :info "running migrations")
+  (initialize-db)
+  (lspf:log-message :info "loading chat from DB")
+  (bt:with-lock-held (*chat-lock*)
+    (load-chat-from-db))
+  (lspf:log-message :info "refreshing screens and menus")
+  (let ((lspf:*application* *veron-app*))
+    (lspf:reload-all-screens)
+    (lspf:load-application-menus *veron-app*))
+  (close-orphaned-chat-sessions)
+  (log-deployment)
+  (lspf:log-message :info "deployment complete"))
+
 (defun start (&key (port 3270) (host "127.0.0.1")
                     tls-port certificate-file key-file key-password (starttls t))
   "Start the VERON application on PORT.
 When CERTIFICATE-FILE and KEY-FILE are provided, TLS is available.
 TLS-PORT enables a dedicated TLS listener. STARTTLS (default T) offers
 STARTTLS negotiation on the plain port."
-  (initialize-db)
-  (load-chat-from-db)
-  (close-orphaned-chat-sessions)
-  (log-deployment)
+  (deploy)
   (lspf:start-application *veron-app* :port port :host host
                            :tls-port tls-port
                            :certificate-file certificate-file
@@ -563,37 +572,14 @@ Recognized variables (all optional, defaults in parentheses):
 (defun reload ()
   "Hot-reload VERON code, run migrations, and refresh caches.
 Called via Swank during deployment. Existing sessions continue running."
-  (format t "~&;;; VERON: hot-reload starting~%")
+  (lspf:log-message :info "hot-reload starting")
   (dolist (sys '(:veron :lispf :lispf-edit :woltlab-login))
     (asdf:clear-system sys))
-  (format t "~&;;; VERON: reloading code~%")
-  (force-output)
+  (lspf:log-message :info "reloading code")
   (handler-bind ((style-warning #'muffle-warning))
     (funcall (find-symbol "QUICKLOAD" :ql) :veron))
-  (format t "~&;;; VERON: code reload done, running post-code steps~%")
-  (force-output)
-  ;; After quickload, reload-post-code is the new version
-  (reload-post-code)
-  (format t "~&;;; VERON: hot-reload complete~%")
-  (force-output)
+  ;; After quickload, deploy is the new version
+  (funcall (find-symbol "DEPLOY" :veron))
+  (lspf:log-message :info "hot-reload complete")
   :ok)
 
-(defun reload-post-code ()
-  "Post-code-reload steps: migrations, chat, screen cache, menus."
-  (format t "~&;;; VERON: running migrations~%")
-  (force-output)
-  (initialize-db)
-  (format t "~&;;; VERON: reloading chat from DB~%")
-  (force-output)
-  (bt:with-lock-held (*chat-lock*)
-    (load-chat-from-db))
-  (format t "~&;;; VERON: refreshing screens and menus~%")
-  (force-output)
-  (let ((lspf:*application* *veron-app*))
-    (lspf:reload-all-screens)
-    (lspf:load-application-menus *veron-app*))
-  (format t "~&;;; VERON: logging deployment~%")
-  (force-output)
-  (log-deployment)
-  (format t "~&;;; VERON: reload-post-code done~%")
-  (force-output))

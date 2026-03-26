@@ -28,7 +28,7 @@ Environment variables must be set (or present in `.env`): `VERON_DB_HOST`, `VERO
 
 ### Source Files (`src/`)
 
-- `package.lisp` - Package definition with local nicknames (`lspf`, `wl`, `pomo`, `editor`)
+- `package.lisp` - Package definition with local nicknames (`pomo`, `editor`)
 - `dotenv.lisp` - `.env` file loader
 - `db.lisp` - PostgreSQL connection, migration runner, persistence functions (guestbook, login log)
 - `user.lisp` - User class, admin group checking, `make-user` from auth result

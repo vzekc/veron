@@ -25,12 +25,12 @@
 
 ;;; Screen update
 
-(lspf:define-screen-update changelog (page-info)
-  (let* ((user (session-user lspf:*session*))
-         (post-login (lspf:session-property lspf:*session* :changelog-post-login))
+(lispf:define-screen-update changelog (page-info)
+  (let* ((user (session-user lispf:*session*))
+         (post-login (lispf:session-property lispf:*session* :changelog-post-login))
          (all-lines (changelog-lines))
          (total (length all-lines))
-         (offset (or (lspf:session-property lspf:*session* :changelog-offset) 0))
+         (offset (or (lispf:session-property lispf:*session* :changelog-offset) 0))
          (page-num (1+ (floor offset +changelog-display-lines+)))
          (total-pages (max 1 (ceiling total +changelog-display-lines+))))
     (when user
@@ -38,23 +38,23 @@
     (setf page-info (format nil "Seite ~D von ~D" page-num total-pages))
     (if post-login
         (progn
-          (lspf:hide-key :pf3)
-          (lspf:show-key :enter "Weiter"))
-        (lspf:show-key :pf3 "Zurueck"))
+          (lispf:hide-key :pf3)
+          (lispf:show-key :enter "Weiter"))
+        (lispf:show-key :pf3 "Zurueck"))
     (when (> offset 0)
-      (lspf:show-key :pf7 "Vor."))
+      (lispf:show-key :pf7 "Vor."))
     (when (< (+ offset +changelog-display-lines+) total)
-      (lspf:show-key :pf8 "Naech."))
+      (lispf:show-key :pf8 "Naech."))
     (when (and user (admin-p user))
-      (lspf:show-key :pf4 "Bearbeiten")
-      (lspf:show-key :pf5 "Neu"))))
+      (lispf:show-key :pf4 "Bearbeiten")
+      (lispf:show-key :pf5 "Neu"))))
 
 ;;; Dynamic area updater
 
-(lspf:define-dynamic-area-updater changelog content ()
+(lispf:define-dynamic-area-updater changelog content ()
   (let* ((all-lines (changelog-lines))
          (total (length all-lines))
-         (offset (or (lspf:session-property lspf:*session* :changelog-offset) 0)))
+         (offset (or (lispf:session-property lispf:*session* :changelog-offset) 0)))
     (loop for i below +changelog-display-lines+
           for line-idx = (+ offset i)
           collect (if (< line-idx total)
@@ -67,34 +67,34 @@
 
 ;;; Key handlers
 
-(lspf:define-key-handler changelog :pf7 ()
-  (let* ((offset (or (lspf:session-property lspf:*session* :changelog-offset) 0))
+(lispf:define-key-handler changelog :pf7 ()
+  (let* ((offset (or (lispf:session-property lispf:*session* :changelog-offset) 0))
          (new-offset (max 0 (- offset +changelog-display-lines+))))
-    (setf (lspf:session-property lspf:*session* :changelog-offset) new-offset))
+    (setf (lispf:session-property lispf:*session* :changelog-offset) new-offset))
   :stay)
 
-(lspf:define-key-handler changelog :pf8 ()
+(lispf:define-key-handler changelog :pf8 ()
   (let* ((all-lines (changelog-lines))
          (total (length all-lines))
-         (offset (or (lspf:session-property lspf:*session* :changelog-offset) 0))
+         (offset (or (lispf:session-property lispf:*session* :changelog-offset) 0))
          (new-offset (+ offset +changelog-display-lines+)))
     (when (< new-offset total)
-      (setf (lspf:session-property lspf:*session* :changelog-offset) new-offset)))
+      (setf (lispf:session-property lispf:*session* :changelog-offset) new-offset)))
   :stay)
 
-(lspf:define-key-handler changelog :enter ()
-  (if (lspf:session-property lspf:*session* :changelog-post-login)
+(lispf:define-key-handler changelog :enter ()
+  (if (lispf:session-property lispf:*session* :changelog-post-login)
       (progn
-        (setf (lspf:session-property lspf:*session* :changelog-offset) 0
-              (lspf:session-property lspf:*session* :changelog-post-login) nil)
+        (setf (lispf:session-property lispf:*session* :changelog-offset) 0
+              (lispf:session-property lispf:*session* :changelog-post-login) nil)
         'main)
       :stay))
 
-(lspf:define-key-handler changelog :pf3 ()
-  (if (lspf:session-property lspf:*session* :changelog-post-login)
+(lispf:define-key-handler changelog :pf3 ()
+  (if (lispf:session-property lispf:*session* :changelog-post-login)
       :stay
       (progn
-        (setf (lspf:session-property lspf:*session* :changelog-offset) 0)
+        (setf (lispf:session-property lispf:*session* :changelog-offset) 0)
         :back)))
 
 (defun format-manual-changelog-heading (username)
@@ -109,21 +109,21 @@
 
 (defun edit-changelog (&optional prepend)
   "Open the changelog in the editor. If PREPEND is non-nil, prepend it first."
-  (unless (admin-p (session-user lspf:*session*))
-    (lspf:application-error "Keine Berechtigung"))
+  (unless (admin-p (session-user lispf:*session*))
+    (lispf:application-error "Keine Berechtigung"))
   (let ((file-id (ensure-changelog-file)))
     (when prepend
       (save-changelog-text (concatenate 'string prepend (load-changelog-text))))
     (let ((path (file-to-disk file-id)))
-      (editor:edit-file path :display-name "Changelog")
+      (lispf-editor:edit-file path :display-name "Changelog")
       (disk-to-file file-id)
       (cleanup-tmp-file file-id))
-    (setf (lspf:session-property lspf:*session* :changelog-offset) 0))
+    (setf (lispf:session-property lispf:*session* :changelog-offset) 0))
   :stay)
 
-(lspf:define-key-handler changelog :pf4 ()
+(lispf:define-key-handler changelog :pf4 ()
   (edit-changelog))
 
-(lspf:define-key-handler changelog :pf5 ()
+(lispf:define-key-handler changelog :pf5 ()
   (edit-changelog (format-manual-changelog-heading
-                   (user-username (session-user lspf:*session*)))))
+                   (user-username (session-user lispf:*session*)))))

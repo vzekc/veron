@@ -88,9 +88,9 @@
   "Send a notification to a ntfy topic. Returns T on success, NIL on error."
   (handler-case
       (progn
-        (dex:post (topic-url topic)
-                  :content message
-                  :headers `(("Title" . ,title)))
+        (dexador:post (topic-url topic)
+                      :content message
+                      :headers `(("Title" . ,title)))
         t)
     (error (e)
       (format *error-output* "~&;;; ntfy error for ~A: ~A~%" topic e)

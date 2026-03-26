@@ -260,8 +260,8 @@ Returns a list of strings or plists (for colored lines)."
 
 (defun user-chat-buffer ()
   "Return the per-user chat buffer for the current session, creating if needed."
-  (or (lspf:session-property lspf:*session* :chat-user-buffer)
-      (setf (lspf:session-property lspf:*session* :chat-user-buffer)
+  (or (lispf:session-property lispf:*session* :chat-user-buffer)
+      (setf (lispf:session-property lispf:*session* :chat-user-buffer)
             (make-array 0 :adjustable t :fill-pointer 0))))
 
 (defun sync-user-chat-buffer (channel-id)
@@ -269,20 +269,20 @@ Returns a list of strings or plists (for colored lines)."
 Skips messages marked as :own (already in the user buffer from local send).
 Returns the per-user buffer."
   (let* ((buf (user-chat-buffer))
-         (synced (or (lspf:session-property lspf:*session* :chat-sync-index) 0))
+         (synced (or (lispf:session-property lispf:*session* :chat-sync-index) 0))
          (shared (channel-messages channel-id))
          (shared-len (length shared))
-         (my-name (let ((user (session-user lspf:*session*)))
+         (my-name (let ((user (session-user lispf:*session*)))
                     (when user (user-username user)))))
     (when (< synced shared-len)
       (loop for i from synced below shared-len
             for msg = (aref shared i)
             unless (and my-name (string-equal (getf msg :username) my-name)
-                        (lspf:session-property lspf:*session* :chat-sent-ids)
+                        (lispf:session-property lispf:*session* :chat-sent-ids)
                         (member (getf msg :id)
-                                (lspf:session-property lspf:*session* :chat-sent-ids)))
+                                (lispf:session-property lispf:*session* :chat-sent-ids)))
             do (vector-push-extend msg buf))
-      (setf (lspf:session-property lspf:*session* :chat-sync-index) shared-len))
+      (setf (lispf:session-property lispf:*session* :chat-sync-index) shared-len))
     buf))
 
 (defun add-own-message (channel-id user message raw-input)
@@ -293,7 +293,7 @@ Returns the per-user buffer."
       (vector-push-extend own-msg (user-chat-buffer)))
     ;; Track sent IDs so sync skips these
     (push (getf msg :id)
-          (lspf:session-property lspf:*session* :chat-sent-ids))))
+          (lispf:session-property lispf:*session* :chat-sent-ids))))
 
 (defun user-message-count (channel-id)
   "Return the number of messages in the per-user buffer."
@@ -345,10 +345,10 @@ Sets the PM flag in the chat indicator if the recipient is not viewing latest ch
                             :created-at (get-universal-time)
                             :private t)))
              (insert-message-sorted (user-chat-buffer) msg))
-           (when (or (not (eq (lspf:session-current-screen lispf:*session*) 'chat))
-                     (lspf:session-property lispf:*session* :chat-scroll-offset))
-             (setf (lspf:session-property lispf:*session* :chat-pm-pending) t)
-             (lspf:set-indicator "chat" (format-chat-indicator chat-count t)))
+           (when (or (not (eq (lispf:session-current-screen lispf:*session*) 'chat))
+                     (lispf:session-property lispf:*session* :chat-scroll-offset))
+             (setf (lispf:session-property lispf:*session* :chat-pm-pending) t)
+             (lispf:set-indicator "chat" (format-chat-indicator chat-count t)))
            (setf (car delivered) t)))))
     (car delivered)))
 
@@ -360,8 +360,8 @@ EXCLUDE-SESSION, if given, is skipped (used to suppress own enter/leave)."
                    :notification t)))
     (lispf:broadcast
      (lambda ()
-       (when (and (eq (lspf:session-current-screen lispf:*session*) 'chat)
-                  (not (lspf:session-property lispf:*session* :chat-leaving))
+       (when (and (eq (lispf:session-current-screen lispf:*session*) 'chat)
+                  (not (lispf:session-property lispf:*session* :chat-leaving))
                   (not (eq lispf:*session* exclude-session)))
          (vector-push-extend (copy-list msg) (user-chat-buffer)))))))
 

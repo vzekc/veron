@@ -57,7 +57,7 @@
 
 ;;; User list screen
 
-(lspf:define-list-data-getter users (start end)
+(lispf:define-list-data-getter users (start end)
   (let* ((total (user-count))
          (entries (list-users start (- end start))))
     (values (loop for e in entries
@@ -70,24 +70,24 @@
                                                 "" (format-datetime ts))))
             total)))
 
-(lspf:define-key-handler users :enter ()
-  (let ((index (lspf:selected-list-index)))
+(lispf:define-key-handler users :enter ()
+  (let ((index (lispf:selected-list-index)))
     (when index
       (let* ((entries (list-users index 1))
              (entry (first entries)))
         (when entry
-          (setf (lspf:session-property lspf:*session* :edit-user-id)
+          (setf (lispf:session-property lispf:*session* :edit-user-id)
                 (getf entry :id))
           'user-edit)))))
 
-(lspf:define-key-handler users :pf5 ()
+(lispf:define-key-handler users :pf5 ()
   'user-new)
 
 ;;; User edit screen
 
-(lspf:define-screen-update user-edit (username email admin last-login user-id)
+(lispf:define-screen-update user-edit (username email admin last-login user-id)
   (let ((entry (find-user-by-id
-                (lspf:session-property lspf:*session* :edit-user-id))))
+                (lispf:session-property lispf:*session* :edit-user-id))))
     (when entry
       (let ((e-email (getf entry :email))
             (ts (getf entry :last-login)))
@@ -98,61 +98,61 @@
                              "" (format-datetime ts))
               user-id (format nil "~D" (getf entry :id)))))))
 
-(lspf:define-key-handler user-edit :pf5 (email admin)
-  (let* ((uid (lspf:session-property lspf:*session* :edit-user-id))
+(lispf:define-key-handler user-edit :pf5 (email admin)
+  (let* ((uid (lispf:session-property lispf:*session* :edit-user-id))
          (entry (find-user-by-id uid)))
     (unless entry
-      (lspf:application-error "Benutzer nicht gefunden"))
+      (lispf:application-error "Benutzer nicht gefunden"))
     (let ((new-email (string-trim '(#\Space) email)))
       (update-user-email uid new-email)
       (if (field-enabled-p admin)
           (add-user-role uid :veron-administrator)
           (remove-user-role uid :veron-administrator))
-      (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+      (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
             "Gespeichert"))
     :stay))
 
-(lspf:define-key-handler user-edit :pf6 ()
-  (let* ((uid (lspf:session-property lspf:*session* :edit-user-id))
+(lispf:define-key-handler user-edit :pf6 ()
+  (let* ((uid (lispf:session-property lispf:*session* :edit-user-id))
          (entry (find-user-by-id uid)))
     (unless entry
-      (lspf:application-error "Benutzer nicht gefunden"))
+      (lispf:application-error "Benutzer nicht gefunden"))
     (let ((password (reset-user-password uid)))
-      (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+      (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
             (format nil "Neues Passwort: ~A" password)))
     :stay))
 
-(lspf:define-key-handler user-edit :pf9 ()
-  (let* ((uid (lspf:session-property lspf:*session* :edit-user-id))
+(lispf:define-key-handler user-edit :pf9 ()
+  (let* ((uid (lispf:session-property lispf:*session* :edit-user-id))
          (entry (find-user-by-id uid))
-         (current-user (session-user lspf:*session*)))
+         (current-user (session-user lispf:*session*)))
     (unless entry
-      (lspf:application-error "Benutzer nicht gefunden"))
+      (lispf:application-error "Benutzer nicht gefunden"))
     (when (= uid (user-id current-user))
-      (lspf:application-error "Eigenen Benutzer kann man nicht loeschen"))
+      (lispf:application-error "Eigenen Benutzer kann man nicht loeschen"))
     (delete-user uid)
-    (setf (lspf:list-offset lspf:*session* 'users) 0)
-    (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+    (setf (lispf:list-offset lispf:*session* 'users) 0)
+    (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
           (format nil "Benutzer ~A geloescht" (getf entry :name)))
     :back))
 
 ;;; New user screen
 
-(lspf:define-screen-update user-new (username email)
+(lispf:define-screen-update user-new (username email)
   (setf username ""
         email ""))
 
-(lspf:define-key-handler user-new :pf5 (username email)
+(lispf:define-key-handler user-new :pf5 (username email)
   (let ((name (string-trim '(#\Space) username))
         (mail (string-trim '(#\Space) email)))
     (when (string= name "")
-      (lspf:application-error "Bitte Benutzername eingeben"))
+      (lispf:application-error "Bitte Benutzername eingeben"))
     (when (find-user-by-name name)
-      (lspf:application-error "Benutzer existiert bereits"))
+      (lispf:application-error "Benutzer existiert bereits"))
     (let ((user (create-local-user name mail)))
-      (setf (lspf:session-property lspf:*session* :edit-user-id)
+      (setf (lispf:session-property lispf:*session* :edit-user-id)
             (user-id user))
-      (setf (lspf:list-offset lspf:*session* 'users) 0)
-      (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
+      (setf (lispf:list-offset lispf:*session* 'users) 0)
+      (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
             (format nil "Benutzer ~A angelegt - Passwort in Serverlog" name))
       'user-edit)))

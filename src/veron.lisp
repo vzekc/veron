@@ -25,7 +25,6 @@
    (connect-time :initform (get-universal-time) :reader session-connect-time)
    (login-id :initform nil :accessor session-login-id)
    (otp-username :initform nil :accessor session-otp-username)
-   (otp-email-masked :initform nil :accessor session-otp-email-masked)
    (otp-attempts :initform 0 :accessor session-otp-attempts)
    (password-reset-sent :initform nil :accessor session-password-reset-sent)))
 
@@ -231,14 +230,7 @@ confirmation message to avoid revealing whether the account exists."
     (when (not (gethash "errormsg" (lispf:session-context session)))
       (lispf:set-field-attribute "errormsg" :color cl3270:+yellow+)
       (setf (gethash "errormsg" (lispf:session-context session))
-            (if (session-password-reset-sent session)
-                "Falls ein Konto existiert, wurde eine E-Mail gesendet"
-                (let ((minutes-ago (lispf:session-property session :otp-minutes-ago))
-                      (email (or (session-otp-email-masked session) "")))
-                  (if minutes-ago
-                      (format nil "Einmalpasswort gesendet vor ~D Min. an: ~A"
-                              minutes-ago email)
-                      (format nil "Einmalpasswort gesendet an: ~A" email))))))))
+            "Falls ein Konto existiert, wurde eine E-Mail gesendet"))))
 
 (lispf:define-key-handler login-otp :enter (otp-code)
   (verify-otp (session-otp-username lispf:*session*) otp-code))

@@ -10,15 +10,6 @@
   "Generate a 6-digit numeric one-time code."
   (format nil "~6,'0D" (random 1000000)))
 
-;;; Email masking
-
-(defun mask-email (email)
-  "Mask an email for display: \"hans@example.com\" -> \"h***@example.com\"."
-  (let ((at-pos (position #\@ email)))
-    (if (and at-pos (> at-pos 0))
-        (format nil "~C***~A" (char email 0) (subseq email at-pos))
-        "***")))
-
 ;;; WoltLab lookup wrappers
 
 (defun lookup-woltlab-email (username)
@@ -88,25 +79,20 @@ Required before store-otp, which UPDATEs the row."
 (defun prepare-otp-login (username)
   "Look up email, generate OTP if needed, send email. Store state on session.
 Reuses an active OTP from the database if one exists.
-Returns the masked email string. Signals application-error on failure."
+Signals application-error on failure."
   (let ((email (lookup-woltlab-email username)))
     (unless email
       (lispf:application-error "Benutzer nicht gefunden"))
     (when (string= email "")
       (lispf:application-error "Keine E-Mail-Adresse hinterlegt"))
     (ensure-user-row username)
-    (multiple-value-bind (existing minutes-ago) (get-active-otp username)
-      (let ((session lispf:*session*))
-        (setf (session-otp-username session) username
-              (session-otp-email-masked session) (mask-email email)
-              (session-otp-attempts session) 0)
-        (if existing
-            (setf (lispf:session-property session :otp-minutes-ago) minutes-ago)
-            (let ((code (generate-otp)))
-              (setf (lispf:session-property session :otp-minutes-ago) nil)
-              (store-otp username code 300)
-              (send-otp-email email username code)))))
-    (mask-email email)))
+    (let ((existing (get-active-otp username)))
+      (setf (session-otp-username lispf:*session*) username
+            (session-otp-attempts lispf:*session*) 0)
+      (unless existing
+        (let ((code (generate-otp)))
+          (store-otp username code 300)
+          (send-otp-email email username code))))))
 
 ;;; OTP authentication
 

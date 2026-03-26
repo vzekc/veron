@@ -1,0 +1,18 @@
+(:name "users"
+ :command t
+ :navigable t
+ :screen "
+
+     Benutzer         E-Mail                         Admin  Letzte Anmeldung
+"
+ :fields ((:from (2 1) :len 1 :name sel :write t :highlighting underscore :repeat 17)
+          (:from (2 5) :len 16 :name name :intense t :color green :repeat 17)
+          (:from (2 22) :len 30 :name email :color turquoise :repeat 17)
+          (:from (2 53) :len 5 :name admin :color yellow :repeat 17)
+          (:from (2 60) :len 16 :name last-login :repeat 17)
+          (:from (19 1) :len 30 :name page-info :color turquoise))
+ :keys ((:enter "Bearb.")
+        (:pf3 "Zurueck" :back t)
+        (:pf5 "Neu")
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

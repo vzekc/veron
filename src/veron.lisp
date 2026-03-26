@@ -63,8 +63,8 @@
 (defmethod lspf:paging-labels ((app (eql *veron-app*)))
   (values "Vor." "Naech."))
 
-(defmethod lspf:menu-key-labels ((app (eql *veron-app*)))
-  (values "Auswahl" "Abmelden"))
+(defmethod lspf:menu-key-labels ((app (eql *veron-app*)) &optional menu-name)
+  (values "Auswahl" (if (equal menu-name "main") "Abmelden" "Zurueck")))
 
 (defmethod lspf:session-authenticated-p ((app (eql *veron-app*)) session)
   (not (null (session-user session))))

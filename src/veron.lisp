@@ -64,6 +64,9 @@
 (defmethod lispf:unknown-command-message ((app (eql *veron-app*)) command)
   (format nil "~A: Unbekannter Befehl" (string-upcase command)))
 
+(defmethod lispf:invalid-menu-selection-message ((app (eql *veron-app*)) selection)
+  (format nil "~A: Ungueltige Auswahl" selection))
+
 (defmethod lispf:default-command-label ((app (eql *veron-app*)))
   "Befehl   ==>")
 
@@ -304,16 +307,14 @@
 ;;; Main screen
 
 (lispf:define-key-handler main :pf3 ()
-  'logout)
-
-;;; Logout confirmation
-
-(lispf:define-key-handler logout :pf5 ()
-  (let ((user (session-user lispf:*session*)))
-    (when user
-      (notify :logout "Abmeldung"
-              (format nil "~A hat sich abgemeldet" (user-username user)))))
-  'goodbye)
+  (lispf:request-confirmation
+   "Wirklich abmelden?"
+   (lambda ()
+     (let ((user (session-user lispf:*session*)))
+       (when user
+         (notify :logout "Abmeldung"
+                 (format nil "~A hat sich abgemeldet" (user-username user)))))
+     'goodbye)))
 
 ;;; Goodbye screen - display for 5 seconds, then disconnect
 

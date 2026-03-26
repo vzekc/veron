@@ -67,6 +67,17 @@ Tables: `users`, `logins`, `guestbook`, `files` (with BYTEA content and mime_typ
 
 ## CI and Testing
 
+**Running a single test:** Use `load-tests.lisp` (loads without running), then `run-tests`:
+```bash
+sbcl --non-interactive --load ~/quicklisp/setup.lisp --load load-tests.lisp \
+  --eval '(lispf-test:run-tests (quote test-name) :package :package-name)'
+```
+Examples:
+- `(lispf-test:run-tests 'e2e-confirmation-confirm-logout :package :veron-tests)`
+- `(lispf-test:run-tests 'layout-default-page-size :package :lispf-editor-tests)`
+
+Always run individual tests during development. Run the full suite before committing.
+
 **Verifying before push:** Run `scripts/test-committed.sh` to test the committed state in an isolated git worktree. This reproduces exactly what CI sees — no uncommitted files, no stale ASDF cache. Always do this before pushing, especially after cross-submodule changes.
 
 **Submodule changes must be atomic:** When modifying code in a submodule (lispf, woltlab-login) that the parent repo depends on, commit and push the submodule first, then update the submodule pointer in veron and push. Never commit parent code that references symbols/functions only present in uncommitted submodule changes.

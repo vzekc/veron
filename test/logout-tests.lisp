@@ -12,7 +12,7 @@
                 :row)))
       (and row (not (veron::db-null-p (first row)))))))
 
-;;; Normal logout via PF3 + PF5 should record logout time.
+;;; Normal logout via PF3 (confirm) + PF5 should record logout time.
 
 (define-test e2e-logout-normal-records-time ()
   (with-test-db (db-name)
@@ -20,8 +20,10 @@
     (veron::load-chat-from-db)
     (with-test-app (s veron::*veron-app*)
       (login s "loguser" "logpass")
+      ;; PF3 on MAIN triggers confirmation prompt (stays on MAIN)
       (press-key s :pf3)
-      (assert-on-screen s "LOGOUT")
+      (assert-on-screen s "MAIN")
+      ;; PF5 confirms logout → goes to GOODBYE
       (press-key s :pf5)
       ;; Disconnect client from goodbye screen
       (ignore-errors (s3270-disconnect s))

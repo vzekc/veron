@@ -71,36 +71,27 @@
       (lispf:application-error "Keine Berechtigung"))
     (let ((entry (lispf:session-property lispf:*session* :browse-entry)))
       (when entry
-        (setf (lispf:session-property lispf:*session* :confirm-delete)
-              (getf entry :id))
-        'guestbook-delete))))
-
-;;; Guestbook delete confirmation
-
-(lispf:define-key-handler guestbook-delete :pf5 ()
-  (let ((entry-id (lispf:session-property lispf:*session* :confirm-delete)))
-    (when entry-id
-      (let ((index (lispf:session-property lispf:*session* :browse-index)))
-        (delete-guestbook-entry entry-id)
-        (setf (lispf:session-property lispf:*session* :confirm-delete) nil)
-        ;; Try to show the next entry (which now occupies the same index)
-        (let* ((entries (guestbook-entries index 1))
-               (entry (first entries)))
-          (cond
-            (entry
-             ;; Next entry exists at same index
-             (setf (lispf:session-property lispf:*session* :browse-entry) entry)
-             (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
-                   "Eintrag geloescht")
-             :back)  ; back to guestbook-entry
-            (t
-             ;; No more entries, return to list
-             (setf (lispf:session-property lispf:*session* :browse-entry) nil)
-             (pop (lispf:session-screen-stack lispf:*session*))
-             (setf (lispf:list-offset lispf:*session* 'guestbook) 0)
-             (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
-                   "Eintrag geloescht")
-             :back)))))))
+        (let ((entry-id (getf entry :id))
+              (index (lispf:session-property lispf:*session* :browse-index)))
+          (lispf:request-confirmation
+           "Gaestebucheintrag loeschen?"
+           (lambda ()
+             (delete-guestbook-entry entry-id)
+             ;; Try to show the next entry (which now occupies the same index)
+             (let* ((entries (guestbook-entries index 1))
+                    (next (first entries)))
+               (cond
+                 (next
+                  (setf (lispf:session-property lispf:*session* :browse-entry) next
+                        (gethash "errormsg" (lispf:session-context lispf:*session*))
+                        "Eintrag geloescht")
+                  :stay)
+                 (t
+                  (setf (lispf:session-property lispf:*session* :browse-entry) nil
+                        (lispf:list-offset lispf:*session* 'guestbook) 0
+                        (gethash "errormsg" (lispf:session-context lispf:*session*))
+                        "Eintrag geloescht")
+                  :back))))))))))
 
 ;;; Guestbook new entry
 

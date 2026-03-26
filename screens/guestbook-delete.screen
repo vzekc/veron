@@ -1,9 +1,0 @@
-(:name "guestbook-delete"
- :screen "
-
-
-   Eintrag wirklich loeschen?
-"
- :fields ()
- :keys ((:pf5 "Ja, loeschen")
-        (:pf3 "Nein" :back t)))

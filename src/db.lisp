@@ -51,7 +51,8 @@
           (pomo:query "SELECT version FROM schema_migrations ORDER BY version")))
 
 (defun migration-files ()
-  (sort (directory (merge-pathnames "*.sql" (migrations-directory)))
+  (sort (append (directory (merge-pathnames "*.sql" (migrations-directory)))
+                (directory (merge-pathnames "*.lisp" (migrations-directory))))
         #'string< :key #'namestring))
 
 (defun migration-version (path)
@@ -64,16 +65,23 @@
         when (plusp (length trimmed))
           collect trimmed))
 
+(defun run-migration-file (file)
+  "Run a single migration file. SQL files execute statements, Lisp files are loaded."
+  (if (string-equal (pathname-type file) "lisp")
+      (load file)
+      (pomo:with-transaction ()
+        (dolist (stmt (split-sql (uiop:read-file-string file)))
+          (pomo:execute stmt)))))
+
 (defun run-migrations ()
   (ensure-migrations-table)
   (let ((applied (applied-versions)))
     (dolist (file (migration-files))
       (let ((version (migration-version file)))
         (unless (member version applied)
-          (format t "Applying migration ~A~%" (pathname-name file))
-          (pomo:with-transaction ()
-            (dolist (stmt (split-sql (uiop:read-file-string file)))
-              (pomo:execute stmt))
+          (lispf:log-message :info "applying migration ~A" (pathname-name file))
+          (run-migration-file file)
+          (with-db
             (pomo:execute (format nil "INSERT INTO schema_migrations (version) VALUES (~D)"
                                   version))))))))
 
@@ -101,8 +109,8 @@
       (1- min-id))))
 
 (defun create-local-user (username email)
-  "Create a local-only user with USERNAME and EMAIL. Generates and prints a random password.
-Returns the new user object."
+  "Create a local-only user with USERNAME and EMAIL. Generates a random password.
+Returns (values user-object password)."
   (let* ((password (generate-password))
          (id (next-local-user-id))
          (hashed (hash-password password)))
@@ -110,13 +118,14 @@ Returns the new user object."
       (pomo:execute
        "INSERT INTO users (id, name, email, local_password, last_login) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)"
        id username email hashed))
-    (format t "Created local user ~A (ID ~D) with password: ~A~%" username id password)
-    (make-instance 'user
-                   :id id
-                   :username username
-                   :email email
-                   :groups nil
-                   :login-time (get-universal-time))))
+    (lispf:log-message :info "created local user ~A (ID ~D)" username id)
+    (values (make-instance 'user
+                           :id id
+                           :username username
+                           :email email
+                           :groups nil
+                           :login-time (get-universal-time))
+            password)))
 
 (defun authenticate-local (username password)
   "Try local password authentication. Returns a plist like woltlab-login on success, NIL otherwise."

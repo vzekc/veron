@@ -196,3 +196,14 @@ Must be used inside with-veron-app."
           *login-local-screen* (load-test-screen-data (merge-pathnames "login-local.screen" dir))
           *guestbook-new-screen* (load-test-screen-data
                                   (merge-pathnames "guestbook-new.screen" dir)))))
+
+;;; Suite fixtures
+
+(define-suite-fixtures
+  (:name :template-db
+   :scope :suite
+   :setup (ensure-template-db)
+   :teardown (drop-template-db))
+  (:name :screen-data
+   :scope :suite
+   :setup (load-screen-data)))

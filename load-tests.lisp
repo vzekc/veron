@@ -1,6 +1,8 @@
-;;;; run-tests.lisp — Load and run all test suites (LISPF + VERON).
+;;;; load-tests.lisp — Load test suites without running them.
 ;;;;
-;;;; Requires PostgreSQL with VERON_DB_* environment variables set.
+;;;; After loading, run individual tests with:
+;;;;   (lispf-test:run-tests 'test-name :package :package-name)
+;;;; Then call (veron-tests::drop-template-db) to clean up.
 
 (defun setup-registry (directory-path)
   (mapc (lambda (asd-pathname)
@@ -14,5 +16,6 @@
 
 (ql:quickload :veron-test)
 
-(unless (lispf-test:run-all-suites)
-  (uiop:quit 1))
+;; Clean up template DB on exit
+(push (lambda () (ignore-errors (veron-tests::drop-template-db)))
+      sb-ext:*exit-hooks*)

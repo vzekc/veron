@@ -187,10 +187,3 @@
     (press-pf s 7)
     (assert-on-screen s "GUESTBOOK-ENTRY")))
 
-;;; Runner
-
-(defun run-all ()
-  (load-screen-data)
-  (format t "~&;;; Running VERON E2E tests~%")
-  (let ((*package* (find-package :veron-tests)))
-    (run-tests)))

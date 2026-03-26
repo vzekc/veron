@@ -1,6 +1,7 @@
 (:name "users"
  :command t
  :navigable t
+ :roles ("veron-administrator")
  :screen "
 
      Benutzer         E-Mail                         Admin  Letzte Anmeldung

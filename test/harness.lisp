@@ -94,12 +94,14 @@ Sets veron::*db-params* globally (so app threads see it) and restores on exit."
 
 ;;; Test user management
 
-(defun create-test-user (username password &key (id 99999))
-  "Create a local user in the test database."
-  (veron::with-db
-    (pomo:execute
-     "INSERT INTO users (id, name, local_password, last_login) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)"
-     id username (veron::hash-password password))))
+(defun create-test-user (username password &key (id 99999) roles)
+  "Create a local user in the test database. ROLES is a list of keyword roles."
+  (let ((role-strings (when roles
+                        (map 'vector (lambda (r) (string-downcase (symbol-name r))) roles))))
+    (veron::with-db
+      (pomo:execute
+       "INSERT INTO users (id, name, local_password, roles, last_login) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)"
+       id username (veron::hash-password password) (or role-strings #())))))
 
 ;;; Combined harness: test DB + VERON app + s3270
 

@@ -1,4 +1,5 @@
 (:name "user-edit"
+ :roles ("veron-administrator")
  :screen "
 
    Benutzerverwaltung

@@ -1,6 +1,6 @@
 ;;; -*- Mode: Lisp -*-
 
-;;; User maintenance screen - admin only
+;;; User maintenance screen - restricted by roles in screen definition
 
 (in-package #:veron)
 
@@ -10,7 +10,7 @@
   "Return a list of user plists for display."
   (with-db
     (pomo:query
-     "SELECT id, name, email, is_admin, last_login FROM users
+     "SELECT id, name, email, roles, last_login FROM users
       ORDER BY name ASC LIMIT $1 OFFSET $2"
      count start :plists)))
 
@@ -22,14 +22,14 @@
   "Look up a user by name. Returns a plist or NIL."
   (with-db
     (first (pomo:query
-            "SELECT id, name, email, is_admin, last_login FROM users WHERE name = $1"
+            "SELECT id, name, email, roles, last_login FROM users WHERE name = $1"
             name :plists))))
 
 (defun find-user-by-id (id)
   "Look up a user by ID. Returns a plist or NIL."
   (with-db
     (first (pomo:query
-            "SELECT id, name, email, is_admin, last_login FROM users WHERE id = $1"
+            "SELECT id, name, email, roles, last_login FROM users WHERE id = $1"
             id :plists))))
 
 (defun update-user-email (user-id email)
@@ -48,17 +48,16 @@
                     (hash-password password) user-id))
     password))
 
-;;; Admin guard
-
-(defun require-admin ()
-  "Check that the current user is an admin. Signals application-error if not."
-  (unless (admin-p (session-user lspf:*session*))
-    (lspf:application-error "Keine Berechtigung")))
+(defun user-has-role-p (entry role)
+  "Check if a user plist has a given role."
+  (let ((roles (getf entry :roles)))
+    (and roles (not (db-null-p roles))
+         (member role (mapcar (lambda (r) (intern (string-upcase r) :keyword))
+                              (coerce roles 'list))))))
 
 ;;; User list screen
 
 (lspf:define-list-data-getter users (start end)
-  (require-admin)
   (let* ((total (user-count))
          (entries (list-users start (- end start))))
     (values (loop for e in entries
@@ -66,13 +65,12 @@
                   for ts = (getf e :last-login)
                   collect (list :name (or (getf e :name) "")
                                 :email (if (db-null-p email) "" (or email ""))
-                                :admin (if (getf e :is-admin) "Ja" "")
+                                :admin (if (user-has-role-p e :veron-administrator) "Ja" "")
                                 :last-login (if (or (null ts) (db-null-p ts))
                                                 "" (format-datetime ts))))
             total)))
 
 (lspf:define-key-handler users :enter ()
-  (require-admin)
   (let ((index (lspf:selected-list-index)))
     (when index
       (let* ((entries (list-users index 1))
@@ -83,13 +81,11 @@
           'user-edit)))))
 
 (lspf:define-key-handler users :pf5 ()
-  (require-admin)
   'user-new)
 
 ;;; User edit screen
 
 (lspf:define-screen-update user-edit (username email admin last-login user-id)
-  (require-admin)
   (let ((entry (find-user-by-id
                 (lspf:session-property lspf:*session* :edit-user-id))))
     (when entry
@@ -97,27 +93,26 @@
             (ts (getf entry :last-login)))
         (setf username (or (getf entry :name) "")
               email (if (db-null-p e-email) "" (or e-email ""))
-              admin (if (getf entry :is-admin) "x" "")
+              admin (if (user-has-role-p entry :veron-administrator) "x" "")
               last-login (if (or (null ts) (db-null-p ts))
                              "" (format-datetime ts))
               user-id (format nil "~D" (getf entry :id)))))))
 
 (lspf:define-key-handler user-edit :pf5 (email admin)
-  (require-admin)
   (let* ((uid (lspf:session-property lspf:*session* :edit-user-id))
          (entry (find-user-by-id uid)))
     (unless entry
       (lspf:application-error "Benutzer nicht gefunden"))
-    (let ((new-email (string-trim '(#\Space) email))
-          (new-admin (field-enabled-p admin)))
+    (let ((new-email (string-trim '(#\Space) email)))
       (update-user-email uid new-email)
-      (set-user-admin (getf entry :name) new-admin)
+      (if (field-enabled-p admin)
+          (add-user-role uid :veron-administrator)
+          (remove-user-role uid :veron-administrator))
       (setf (gethash "errormsg" (lspf:session-context lspf:*session*))
             "Gespeichert"))
     :stay))
 
 (lspf:define-key-handler user-edit :pf6 ()
-  (require-admin)
   (let* ((uid (lspf:session-property lspf:*session* :edit-user-id))
          (entry (find-user-by-id uid)))
     (unless entry
@@ -128,7 +123,6 @@
     :stay))
 
 (lspf:define-key-handler user-edit :pf9 ()
-  (require-admin)
   (let* ((uid (lspf:session-property lspf:*session* :edit-user-id))
          (entry (find-user-by-id uid))
          (current-user (session-user lspf:*session*)))
@@ -145,12 +139,10 @@
 ;;; New user screen
 
 (lspf:define-screen-update user-new (username email)
-  (require-admin)
   (setf username ""
         email ""))
 
 (lspf:define-key-handler user-new :pf5 (username email)
-  (require-admin)
   (let ((name (string-trim '(#\Space) username))
         (mail (string-trim '(#\Space) email)))
     (when (string= name "")

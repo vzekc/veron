@@ -13,16 +13,29 @@
   (print-unreadable-object (user stream :type t)
     (format stream "~A (ID ~D)" (user-username user) (user-id user))))
 
+;;; Roles
+
+(defvar *available-roles* '(:veron-administrator)
+  "List of all defined roles in the system.")
+
 (defvar *admin-groups* '("Administratoren")
   "List of WoltLab group names that grant admin privileges.")
 
+(defun effective-roles (user)
+  "Return the combined roles for USER: DB roles + WoltLab-derived roles."
+  (let ((db-roles (mapcar (lambda (r) (intern (string-upcase r) :keyword))
+                          (user-db-roles (user-id user))))
+        (extra '()))
+    (when (some (lambda (group)
+                  (member (getf group :group-name) *admin-groups* :test #'string=))
+                (user-groups user))
+      (push :veron-administrator extra))
+    (union db-roles extra)))
+
 (defun admin-p (user)
-  "Return T if USER belongs to any admin group or has the is_admin flag set."
+  "Return T if USER has the veron-administrator role."
   (and user
-       (or (some (lambda (group)
-                   (member (getf group :group-name) *admin-groups* :test #'string=))
-                 (user-groups user))
-           (user-admin-db-p (user-id user)))))
+       (member :veron-administrator (effective-roles user))))
 
 (defun make-user (auth-result)
   "Create a user from an authenticate-user result plist."

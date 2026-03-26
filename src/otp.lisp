@@ -161,6 +161,9 @@ Returns 'main on success. Signals application-error on failure."
           (record-login user
                         :terminal-type (session-term-type lspf:*session*)
                         :tls (lspf:session-tls-p lspf:*session*)))
+    (lspf:log-message :info "login user=~A tls=~A"
+                      (user-username user)
+                      (if (lspf:session-tls-p lspf:*session*) "yes" "no"))
     (notify :login "Anmeldung"
             (format nil "~A hat sich angemeldet" (user-username user)))
     (update-my-chat-indicator)))

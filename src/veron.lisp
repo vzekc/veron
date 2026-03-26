@@ -42,9 +42,12 @@
 ;;; Session cleanup - called for all disconnection paths
 
 (defmethod lspf:session-cleanup ((app (eql *veron-app*)) session)
-  (let ((login-id (session-login-id session)))
+  (let ((login-id (session-login-id session))
+        (user (session-user session)))
     (when login-id
-      (record-logout login-id))))
+      (record-logout login-id))
+    (when user
+      (lspf:log-message :info "logout user=~A" (user-username user)))))
 
 ;;; Application customization
 
@@ -72,6 +75,37 @@
 (defmethod lspf:anonymous-access-denied-message ((app (eql *veron-app*)))
   "Anmeldung erforderlich")
 
+(defmethod lspf:session-user-roles ((app (eql *veron-app*)) session)
+  (let ((user (session-user session)))
+    (when user (effective-roles user))))
+
+(defmethod lspf:role-access-denied-message ((app (eql *veron-app*)))
+  "Keine Berechtigung")
+
+
+;;; Orphaned session cleanup
+
+(defun close-orphaned-chat-sessions ()
+  "Close open login sessions from a previous server run and add chat disconnect notifications."
+  (let ((users (close-orphaned-sessions)))
+    (when users
+      (let ((channel-id (default-channel-id)))
+        (when channel-id
+          (dolist (user-pair users)
+            (destructuring-bind (user-id username) user-pair
+              (let* ((msg-text (format nil "--- ~A wurde getrennt (Neustart)" username))
+                     (db-id (insert-chat-message channel-id user-id username
+                                                 msg-text "notification"))
+                     (msg (list :id db-id
+                                :type :notification
+                                :message msg-text
+                                :created-at (get-universal-time))))
+                (bt:with-lock-held (*chat-lock*)
+                  (let ((buf (ensure-channel-buffer channel-id)))
+                    (vector-push-extend msg buf))
+                  (setf *chat-id-counter* (max *chat-id-counter* db-id))))))))
+      (format t "~&;;; VERON: closed ~D orphaned session~:P~%" (length users))
+      (lspf:log-message :info "Closed ~D orphaned session~:P" (length users)))))
 
 ;;; Utility
 
@@ -471,6 +505,7 @@ TLS-PORT enables a dedicated TLS listener. STARTTLS (default T) offers
 STARTTLS negotiation on the plain port."
   (initialize-db)
   (load-chat-from-db)
+  (close-orphaned-chat-sessions)
   (log-deployment)
   (lspf:start-application *veron-app* :port port :host host
                            :tls-port tls-port

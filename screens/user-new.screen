@@ -1,4 +1,5 @@
 (:name "user-new"
+ :roles ("veron-administrator")
  :screen "
 
    Neuen Benutzer anlegen

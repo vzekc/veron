@@ -60,6 +60,7 @@ Tables: `users`, `logins`, `guestbook`, `files` (with BYTEA content and mime_typ
 - **defclass over defstruct** always — never use defstruct
 - **case with find-symbol** for command dispatch instead of cond chains
 - **Early returns** with `unless`/`when` + `return-from` instead of `(if cond (progn ...) error-value)`
+- **unless over negated if**: `(unless cond ...)` instead of `(if cond nil ...)` — avoids progn in the else branch
 - **Combined setf**: `(setf a 1 b 2 c 3)` instead of separate setf calls
 - **when-let** (from alexandria) for bind-and-test patterns
 - **Top-level form separation**: Top level forms and comment blocks are separated by empty lines

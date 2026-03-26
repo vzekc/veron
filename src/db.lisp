@@ -155,17 +155,36 @@ MINUTES-AGO is how many minutes since the OTP was sent (based on 5min expiry win
     (pomo:execute "UPDATE users SET otp_code = NULL, otp_expires = NULL WHERE name = $1"
                   username)))
 
-(defun user-admin-db-p (user-id)
-  "Return T if the user has the is_admin flag set in the database."
+(defun user-db-roles (user-id)
+  "Return the list of roles for a user from the database."
   (with-db
-    (pomo:query "SELECT is_admin FROM users WHERE id = $1"
-                user-id :single)))
+    (let ((result (pomo:query "SELECT roles FROM users WHERE id = $1"
+                              user-id :single)))
+      (if (or (null result) (db-null-p result))
+          nil
+          (coerce result 'list)))))
 
-(defun set-user-admin (username admin-p)
-  "Set the is_admin flag for USERNAME."
+(defun set-user-roles (user-id roles)
+  "Set the roles array for a user."
   (with-db
-    (pomo:execute "UPDATE users SET is_admin = $1 WHERE name = $2"
-                  admin-p username)))
+    (pomo:execute "UPDATE users SET roles = $1 WHERE id = $2"
+                  (coerce roles 'vector) user-id)))
+
+(defun add-user-role (user-id role)
+  "Add a role to a user if not already present. ROLE is a keyword."
+  (let ((role-string (string-downcase (symbol-name role))))
+    (with-db
+      (pomo:execute
+       "UPDATE users SET roles = array_append(roles, $1) WHERE id = $2 AND NOT ($1 = ANY(roles))"
+       role-string user-id))))
+
+(defun remove-user-role (user-id role)
+  "Remove a role from a user. ROLE is a keyword."
+  (let ((role-string (string-downcase (symbol-name role))))
+    (with-db
+      (pomo:execute
+       "UPDATE users SET roles = array_remove(roles, $1) WHERE id = $2"
+       role-string user-id))))
 
 (defun ensure-db-user (user)
   (with-db
@@ -186,6 +205,17 @@ MINUTES-AGO is how many minutes since the OTP was sent (based on 5min expiry win
       (pomo:execute
        "UPDATE logins SET logout_at = CURRENT_TIMESTAMP WHERE id = $1"
        login-id))))
+
+(defun close-orphaned-sessions ()
+  "Close all open login sessions. Returns list of (user-id username) pairs."
+  (with-db
+    (let ((users (pomo:query
+                  "SELECT DISTINCT u.id, u.name FROM logins l
+                   JOIN users u ON l.user_id = u.id
+                   WHERE l.logout_at IS NULL")))
+      (pomo:execute
+       "UPDATE logins SET logout_at = CURRENT_TIMESTAMP WHERE logout_at IS NULL")
+      users)))
 
 (defun db-null-p (value)
   "Return T if VALUE is a Postmodern NULL marker."

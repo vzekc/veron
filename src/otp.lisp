@@ -108,6 +108,19 @@ Returns the masked email string. Signals application-error on failure."
               (send-otp-email email username code)))))
     (mask-email email)))
 
+;;; OTP authentication
+
+(defun authenticate-with-otp (username code)
+  "Check if CODE is a valid OTP for USERNAME.
+Returns a plist compatible with authenticate-user on success, NIL on failure.
+On success, consumes the OTP and includes :otp-login t in the result."
+  (let ((stored-code (get-active-otp username)))
+    (when (and stored-code (string= code stored-code))
+      (clear-otp username)
+      (when-let ((result (or (lookup-woltlab-user username)
+                             (lookup-local-user username))))
+        (append result (list :otp-login t))))))
+
 ;;; OTP verification
 
 (defun verify-otp (username code)

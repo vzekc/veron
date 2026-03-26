@@ -106,6 +106,27 @@
     (assert-on-screen s "LOGIN-LOCAL")
     (assert-screen-contains s "bereits angefordert")))
 
+;;; TLS login accepts valid OTP code as password
+
+(define-test e2e-login-tls-otp-as-password ()
+  (setf (lispf:application-test-force-tls veron::*veron-app*) t)
+  (unwind-protect
+       (with-veron-app (s :username "otpuser" :password "testpass")
+         ;; Store an OTP code for this user
+         (veron::with-db
+           (veron::store-otp "otpuser" "123456" 300))
+         (assert-on-screen s "LOGIN")
+         ;; Type username, press enter to move to password field
+         (type-text s "otpuser")
+         (press-enter s)
+         (assert-on-screen s "LOGIN")
+         ;; Type the OTP code as password
+         (type-text s "123456")
+         (press-enter s)
+         ;; OTP login should go to set-password-otp screen
+         (assert-on-screen s "SET-PASSWORD-OTP"))
+    (setf (lispf:application-test-force-tls veron::*veron-app*) nil)))
+
 ;;; Password field cleared after failed login attempt
 ;;; A long wrong password followed by a shorter correct password must work.
 ;;; Without clearing, remnants of the long password would corrupt the short one.

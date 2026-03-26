@@ -139,6 +139,17 @@ Returns (values user-object password)."
               :email (or (fourth row) "")
               :groups nil)))))
 
+(defun lookup-local-user (username)
+  "Look up a local user by name. Returns a plist like woltlab-login, or NIL."
+  (with-db
+    (let ((row (pomo:query "SELECT id, name, email FROM users WHERE name = $1"
+                            username :row)))
+      (when row
+        (list :user-id (first row)
+              :username (second row)
+              :email (or (third row) "")
+              :groups nil)))))
+
 (defun has-local-password-p (username)
   "Return T if USERNAME has a local password set."
   (with-db

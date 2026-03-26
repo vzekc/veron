@@ -154,7 +154,7 @@
       ((and tls-p (<= (lispf:cursor-row) 19) (string= password ""))
        (lispf:set-cursor 20 19)
        :stay)
-      ;; TLS: standard WoltLab login
+      ;; TLS: standard WoltLab login, also accepts valid OTP as password
       (tls-p
        (when (string= password "")
          (lispf:application-error "Bitte Passwort eingeben"))
@@ -165,11 +165,14 @@
                                                  :port (parse-integer (env "VERON_AUTH_DB_PORT"))
                                                  :database (env "VERON_AUTH_DB_NAME")
                                                  :user (env "VERON_AUTH_DB_USER")
-                                                 :db-password (env "VERON_AUTH_DB_PASSWORD"))))))
+                                                 :db-password (env "VERON_AUTH_DB_PASSWORD")))
+                         (authenticate-with-otp username password))))
          (unless result
            (lispf:application-error "Ungueltiger Benutzername oder Passwort"))
          (complete-login result)
-         (post-login-screen)))
+         (if (getf result :otp-login)
+             'set-password-otp
+             (post-login-screen))))
       ;; Non-TLS: user has local password
       ((has-local-password-p username)
        (setf (session-otp-username lispf:*session*) username)

@@ -29,6 +29,22 @@
   (with-veron-app (s :username "spaceuser" :password "pass word 123")
     (login s "spaceuser" "pass word 123")))
 
+;;; Enter on username field moves cursor to password field start (TLS mode)
+
+(define-test e2e-login-enter-cursor-to-password ()
+  (setf (lispf:application-test-force-tls veron::*veron-app*) t)
+  (unwind-protect
+       (with-veron-app (s :username "testuser" :password "testpass")
+         (assert-on-screen s "LOGIN")
+         ;; Type username and press Enter — should move cursor to password field
+         (type-text s "testuser")
+         (press-enter s)
+         (assert-on-screen s "LOGIN")
+         ;; Password field :from (19 19), +1 row for title = row 20
+         ;; Data starts at col 19 (attribute byte at col 18)
+         (assert-cursor-at s 20 19 :description "Cursor at start of password field"))
+    (setf (lispf:application-test-force-tls veron::*veron-app*) nil)))
+
 ;;; Password field cleared after failed login attempt
 ;;; A long wrong password followed by a shorter correct password must work.
 ;;; Without clearing, remnants of the long password would corrupt the short one.

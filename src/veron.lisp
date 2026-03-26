@@ -150,7 +150,7 @@
     (cond
       ;; TLS: cursor on username row → move to password field
       ((and tls-p (<= (lispf:cursor-row) 19) (string= password ""))
-       (lispf:set-cursor 20 20)
+       (lispf:set-cursor 20 19)
        :stay)
       ;; TLS: standard WoltLab login
       (tls-p

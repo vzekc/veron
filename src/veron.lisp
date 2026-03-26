@@ -46,6 +46,13 @@
         (user (session-user session)))
     (when login-id
       (record-logout login-id))
+    (when (and user (lspf:session-property session :chat-entered)
+               (not (lspf:session-property session :chat-leaving)))
+      (let ((channel-id (default-channel-id)))
+        (when channel-id
+          (add-chat-notification channel-id user
+                                 "--- ~A hat den Chat verlassen"
+                                 (user-username user)))))
     (when user
       (lspf:log-message :info "logout user=~A" (user-username user)))))
 
@@ -55,7 +62,7 @@
   (format nil "~A: Unbekannte Taste" key-name))
 
 (defmethod lspf:unknown-command-message ((app (eql *veron-app*)) command)
-  (format nil "~A: Unbekannter Befehl" command))
+  (format nil "~A: Unbekannter Befehl" (string-upcase command)))
 
 (defmethod lspf:default-command-label ((app (eql *veron-app*)))
   "Befehl   ==>")
@@ -86,7 +93,7 @@
 ;;; Orphaned session cleanup
 
 (defun close-orphaned-chat-sessions ()
-  "Close open login sessions from a previous server run and add chat disconnect notifications."
+  "Close open login sessions from previous server instances and add chat disconnect notifications."
   (let ((users (close-orphaned-sessions)))
     (when users
       (let ((channel-id (default-channel-id)))

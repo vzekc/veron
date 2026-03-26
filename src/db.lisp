@@ -2,6 +2,18 @@
 
 (in-package #:veron)
 
+;;; Server instance ID
+
+(defun generate-uuid-v4 ()
+  "Generate a random UUID v4 string."
+  (let ((bytes (ironclad:random-data 16)))
+    (setf (aref bytes 6) (logior (logand (aref bytes 6) #x0f) #x40)
+          (aref bytes 8) (logior (logand (aref bytes 8) #x3f) #x80))
+    (format nil "~(~{~2,'0X~}~)" (coerce bytes 'list))))
+
+(defvar *server-instance-id* (generate-uuid-v4)
+  "Unique ID for this server process, stored in login records.")
+
 ;;; Database connection
 
 (defvar *db-params* nil
@@ -196,8 +208,8 @@ MINUTES-AGO is how many minutes since the OTP was sent (based on 5min expiry win
 (defun record-login (user &key terminal-type tls)
   (with-db
     (pomo:query
-     "INSERT INTO logins (user_id, terminal_type, tls) VALUES ($1, $2, $3) RETURNING id"
-     (user-id user) terminal-type tls :single)))
+     "INSERT INTO logins (user_id, terminal_type, tls, server_instance_id) VALUES ($1, $2, $3, $4) RETURNING id"
+     (user-id user) terminal-type tls *server-instance-id* :single)))
 
 (defun record-logout (login-id)
   (when login-id
@@ -207,14 +219,20 @@ MINUTES-AGO is how many minutes since the OTP was sent (based on 5min expiry win
        login-id))))
 
 (defun close-orphaned-sessions ()
-  "Close all open login sessions. Returns list of (user-id username) pairs."
+  "Close open login sessions from previous server instances.
+Returns list of (user-id username) pairs for closed sessions."
   (with-db
     (let ((users (pomo:query
                   "SELECT DISTINCT u.id, u.name FROM logins l
                    JOIN users u ON l.user_id = u.id
-                   WHERE l.logout_at IS NULL")))
+                   WHERE l.logout_at IS NULL
+                     AND (l.server_instance_id IS NULL OR l.server_instance_id != $1)"
+                  *server-instance-id*)))
       (pomo:execute
-       "UPDATE logins SET logout_at = CURRENT_TIMESTAMP WHERE logout_at IS NULL")
+       "UPDATE logins SET logout_at = CURRENT_TIMESTAMP
+        WHERE logout_at IS NULL
+          AND (server_instance_id IS NULL OR server_instance_id != $1)"
+       *server-instance-id*)
       users)))
 
 (defun db-null-p (value)

@@ -2,7 +2,8 @@
  :title "Hauptmenue"
  :items ((:key "1" :label "Gaestebuch" :description "Eintraege lesen und schreiben" :screen guestbook)
          (:key "2" :label "Community" :description "Chat, Wer ist da?" :screen community)
-         (:key "3" :label "RetroStar" :description "RetroStar Netzwerk" :screen retrostar)
-         (:key "4" :label "Persoenlich" :description "Editor, Passwort, Meldungen" :screen personal)
-         (:key "5" :label "System" :description "Aenderungen, Protokoll, Benutzer" :screen system)
-         (:key "6" :label "Hilfe" :description "VERON Hilfe" :screen hilfe)))
+         (:key "3" :label "Classic Computing" :description "Veranstaltungen, Aussteller, Exponate" :screen cc)
+         (:key "4" :label "RetroStar" :description "RetroStar Netzwerk" :screen retrostar)
+         (:key "5" :label "Persoenlich" :description "Editor, Passwort, Meldungen" :screen personal)
+         (:key "6" :label "System" :description "Aenderungen, Protokoll, Benutzer" :screen system)
+         (:key "7" :label "Hilfe" :description "VERON Hilfe" :screen hilfe)))

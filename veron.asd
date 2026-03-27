@@ -22,6 +22,8 @@
                              (:file "network-screen")
                              (:file "decnet-screen")
                              (:file "events-screen")
+                             (:file "exhibitron-db")
+                             (:file "cc-screen")
                              (:file "veron"))))
   :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern #:dexador #:ironclad #:swank #:cl-smtp)
   :in-order-to ((asdf:test-op (asdf:test-op #:veron-test))))

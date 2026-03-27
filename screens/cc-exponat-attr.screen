@@ -1,0 +1,17 @@
+(:name "cc-exponat-attr"
+ :screen "
+
+Titel.....:
+Aussteller:
+Tisch.....:
+Anfassen..:
+"
+ :fields ((:from (1 14) :len 64 :name title :intense t :color green)
+          (:from (2 14) :len 50 :name exhibitor-name)
+          (:from (3 14) :len 10 :name table-number :color turquoise)
+          (:from (4 14) :len 10 :name touch-me :color yellow)
+          (:from (6 3) :len 18 :name attr-name :color turquoise :repeat 13)
+          (:from (6 22) :len 1 :name attr-sep :repeat 13)
+          (:from (6 24) :len 54 :name attr-value :repeat 13))
+ :keys ((:pf3 "Zurueck" :back t)
+        (:pf4 "Beschreibung" :hidden t)))

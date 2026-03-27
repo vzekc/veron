@@ -155,6 +155,28 @@ If redirected to the changelog screen, press Enter to reach MAIN."
       (press-enter session)))
   (assert-on-screen session "MAIN"))
 
+(defun select-menu-item (session label)
+  "Select a menu item by its label text. Finds the item number from the screen
+and types it in the command field."
+  (let* ((rows (screen-text session))
+         (number nil))
+    (dolist (row rows)
+      (let ((trimmed (string-trim '(#\Space) row)))
+        (when (and (> (length trimmed) 0)
+                   (digit-char-p (char trimmed 0)))
+          (let* ((space-pos (position #\Space trimmed))
+                 (key (subseq trimmed 0 space-pos))
+                 (rest (string-trim '(#\Space) (subseq trimmed space-pos))))
+            (when (and (>= (length rest) (length label))
+                       (string-equal label (subseq rest 0 (length label))))
+              (setf number key)
+              (return))))))
+    (assert number () "Menu item ~S not found on screen" label)
+    (move-cursor session 21 14)
+    (erase-eof session)
+    (type-text session number)
+    (press-enter session)))
+
 (defun navigate-to (session screen-name)
   "Navigate to SCREEN-NAME via the command field.
 Waits for the target screen to appear (handles background update races)."

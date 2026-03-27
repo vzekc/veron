@@ -1,0 +1,7 @@
+(:name "cc"
+ :title "Classic Computing"
+ :command t
+ :items ((:key "1" :label "Aussteller" :description "Aussteller der Veranstaltung" :screen cc-aussteller)
+         (:key "2" :label "Exponate" :description "Ausgestellte Exponate" :screen cc-exponate)
+         (:key "3" :label "Tische" :description "Tischbelegung" :screen cc-tische)
+         (:key "4" :label "Veranstaltung" :description "Andere Veranstaltung waehlen" :screen cc-auswahl)))

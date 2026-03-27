@@ -140,8 +140,8 @@
     (t
      (setf password-label "")
      (lispf:set-field-attribute "password" :write nil)
-     (unless (gethash "errormsg" (lispf:session-context lispf:*session*))
-       (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+     (unless (gethash "%errormsg" (lispf:session-context lispf:*session*))
+       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
              "Warnung: Verbindung ist nicht verschluesselt!")))))
 
 (lispf:define-key-handler login :enter (username password)
@@ -226,9 +226,9 @@ confirmation message to avoid revealing whether the account exists."
   (let ((session lispf:*session*))
     (setf username (or (session-otp-username session) "")
           otp-code "")
-    (when (not (gethash "errormsg" (lispf:session-context session)))
-      (lispf:set-field-attribute "errormsg" :color cl3270:+yellow+)
-      (setf (gethash "errormsg" (lispf:session-context session))
+    (when (not (gethash "%errormsg" (lispf:session-context session)))
+      (lispf:set-field-attribute "%errormsg" :color cl3270:+yellow+)
+      (setf (gethash "%errormsg" (lispf:session-context session))
             "Falls ein Konto existiert, wurde eine E-Mail gesendet"))))
 
 (lispf:define-key-handler login-otp :enter (otp-code)
@@ -243,8 +243,8 @@ confirmation message to avoid revealing whether the account exists."
   (let ((saved (lispf:session-property lispf:*session* :saved-password)))
     (setf new-password (or saved "")
           confirm-password ""))
-  (when (not (gethash "errormsg" (lispf:session-context lispf:*session*)))
-    (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+  (when (not (gethash "%errormsg" (lispf:session-context lispf:*session*)))
+    (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
           "Bitte lokales Passwort setzen")))
 
 (lispf:define-key-handler set-password-otp :enter (new-password confirm-password)
@@ -263,7 +263,7 @@ confirmation message to avoid revealing whether the account exists."
           (lispf:application-error "Passwoerter stimmen nicht ueberein"))
         (let ((user (session-user lispf:*session*)))
           (save-local-password (user-id user) new-password)
-          (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+          (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
                 "Passwort gespeichert"))
         (post-login-screen))))
 
@@ -310,7 +310,7 @@ confirmation message to avoid revealing whether the account exists."
        (lispf:application-error "Passwoerter stimmen nicht ueberein"))
      (let ((user (session-user lispf:*session*)))
        (save-local-password (user-id user) new-password)
-       (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
              "Passwort gespeichert"))
      'main)))
 
@@ -448,16 +448,16 @@ confirmation message to avoid revealing whether the account exists."
     ;; Create new subscription if topic and events are set
     (cond
       ((and (string= topic-name "") (null events))
-       (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
              "Benachrichtigungen deaktiviert"))
       ((string= topic-name "")
        (lispf:application-error "Bitte ntfy-Topic eingeben"))
       ((null events)
-       (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
              "Benachrichtigungen deaktiviert"))
       (t
        (subscribe (user-id user) topic-name (nreverse events))
-       (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
              "Gespeichert")))
     :stay))
 
@@ -573,6 +573,11 @@ If the changelog has unread entries, go to changelog; otherwise main."
   (lispf:log-message :info "loading chat from DB")
   (bt:with-lock-held (*chat-lock*)
     (load-chat-from-db))
+  (lispf:log-message :info "loading message catalog")
+  (lispf:set-message-catalog
+   *veron-app*
+   (merge-pathnames #P"i18n/de.lisp"
+                    (asdf:system-source-directory :lispf)))
   (lispf:log-message :info "refreshing screens and menus")
   (let ((lispf:*application* *veron-app*))
     (lispf:reload-all-screens)

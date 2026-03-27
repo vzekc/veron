@@ -1,0 +1,22 @@
+(:name "cc-aussteller-exponate"
+ :navigable t
+ :screen "
+
+Name......:
+Thema.....:
+Tische....:
+
+     Exponat                                                     Tisch
+"
+ :fields ((:from (1 14) :len 50 :name name :intense t :color green)
+          (:from (2 14) :len 64 :name topic)
+          (:from (3 14) :len 30 :name table-list :color turquoise)
+          (:from (5 1) :len 1 :name sel :write t :highlighting underscore :repeat 13)
+          (:from (5 5) :len 60 :name exhibit-title :intense t :repeat 13)
+          (:from (5 66) :len 5 :name exhibit-table :color turquoise :repeat 13)
+          (:from (18 1) :len 30 :name page-info :color turquoise))
+ :keys ((:enter "Details")
+        (:pf3 "Zurueck" :back t)
+        (:pf4 "Info" :hidden t)
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

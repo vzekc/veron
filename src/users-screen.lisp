@@ -124,7 +124,7 @@
       (if (field-enabled-p admin)
           (add-user-role uid :veron-administrator)
           (remove-user-role uid :veron-administrator))
-      (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+      (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
             "Gespeichert"))
     :stay))
 
@@ -137,7 +137,7 @@
      (format nil "Kennwort fuer ~A zuruecksetzen?" (getf entry :name))
      (lambda ()
        (let ((password (reset-user-password uid)))
-         (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+         (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
                (format nil "Neues Passwort: ~A" password)))
        :stay))))
 
@@ -154,7 +154,7 @@
      (lambda ()
        (delete-user uid)
        (setf (lispf:list-offset lispf:*session* 'users) 0
-             (gethash "errormsg" (lispf:session-context lispf:*session*))
+             (gethash "%errormsg" (lispf:session-context lispf:*session*))
              (format nil "Benutzer ~A geloescht" (getf entry :name)))
        :back))))
 
@@ -179,6 +179,6 @@
     (multiple-value-bind (user password) (create-local-user name mail)
       (declare (ignore user))
       (setf (lispf:list-offset lispf:*session* 'users) 0
-            (gethash "errormsg" (lispf:session-context lispf:*session*))
+            (gethash "%errormsg" (lispf:session-context lispf:*session*))
             (format nil "Benutzer ~A angelegt - Passwort: ~A" name password))
       :back)))

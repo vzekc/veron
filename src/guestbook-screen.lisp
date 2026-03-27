@@ -83,13 +83,13 @@
                (cond
                  (next
                   (setf (lispf:session-property lispf:*session* :browse-entry) next
-                        (gethash "errormsg" (lispf:session-context lispf:*session*))
+                        (gethash "%errormsg" (lispf:session-context lispf:*session*))
                         "Eintrag geloescht")
                   :stay)
                  (t
                   (setf (lispf:session-property lispf:*session* :browse-entry) nil
                         (lispf:list-offset lispf:*session* 'guestbook) 0
-                        (gethash "errormsg" (lispf:session-context lispf:*session*))
+                        (gethash "%errormsg" (lispf:session-context lispf:*session*))
                         "Eintrag geloescht")
                   :back))))))))))
 
@@ -143,7 +143,7 @@
       ;; Reset list offset so the new entry is visible at the top
       (setf (lispf:list-offset lispf:*session* 'guestbook) 0)
       ;; Set confirmation message for the guestbook list
-      (setf (gethash "errormsg" (lispf:session-context lispf:*session*))
+      (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
             "Eintrag gespeichert")))
   ;; Pop back past guestbook-new to the guestbook list
   (pop (lispf:session-screen-stack lispf:*session*))

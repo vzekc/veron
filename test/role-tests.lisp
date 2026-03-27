@@ -11,16 +11,10 @@
     (login s "normaluser" "testpass")
     (assert-on-screen s "MAIN")
     ;; Navigate to system menu
-    (move-cursor s 21 14)
-    (erase-eof s)
-    (type-text s "5")
-    (press-enter s)
+    (select-menu-item s "System")
     (assert-on-screen s "SYSTEM")
     ;; Try to access users screen
-    (move-cursor s 21 14)
-    (erase-eof s)
-    (type-text s "3")
-    (press-enter s)
+    (select-menu-item s "Benutzer")
     ;; Should stay on system with permission denied message
     (assert-on-screen s "SYSTEM")
     (assert (wait-for-screen-contains s "Keine Berechtigung" :timeout 2))))
@@ -35,15 +29,9 @@
       (login s "adminuser" "testpass")
       (assert-on-screen s "MAIN")
       ;; Navigate to system → users
-      (move-cursor s 21 14)
-      (erase-eof s)
-      (type-text s "5")
-      (press-enter s)
+      (select-menu-item s "System")
       (assert-on-screen s "SYSTEM")
-      (move-cursor s 21 14)
-      (erase-eof s)
-      (type-text s "3")
-      (press-enter s)
+      (select-menu-item s "Benutzer")
       (assert-on-screen s "USERS"))))
 
 ;;; Direct navigation by name is also denied

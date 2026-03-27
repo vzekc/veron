@@ -1,0 +1,14 @@
+(:name "cc-aussteller"
+ :navigable t
+ :screen "
+
+     Name                      Thema
+"
+ :fields ((:from (2 1) :len 1 :name sel :write t :highlighting underscore :repeat 18)
+          (:from (2 5) :len 25 :name name :intense t :color green :repeat 18)
+          (:from (2 31) :len 48 :name topic :repeat 18)
+          (:from (20 1) :len 30 :name page-info :color turquoise))
+ :keys ((:enter "Details")
+        (:pf3 "Zurueck" :back t)
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

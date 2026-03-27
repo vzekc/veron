@@ -11,15 +11,12 @@
     (login s "menuuser" "menupass")
     (assert-on-screen s "MAIN")
     ;; Navigate to system submenu
-    (move-cursor s 21 14)
-    (erase-eof s)
-    (type-text s "5")
-    (press-enter s)
+    (select-menu-item s "System")
     (assert-on-screen s "SYSTEM")
-    ;; Type "4" — system only has items 1-3, should show error
+    ;; Type "99" — no such item, should show error
     (move-cursor s 21 14)
     (erase-eof s)
-    (type-text s "4")
+    (type-text s "99")
     (press-enter s)
     (assert-on-screen s "SYSTEM")
     (assert (wait-for-screen-contains s "Ungueltige Auswahl" :timeout 2)
@@ -32,16 +29,10 @@
     (login s "menuuser2" "menupass2")
     (assert-on-screen s "MAIN")
     ;; Navigate to system submenu
-    (move-cursor s 21 14)
-    (erase-eof s)
-    (type-text s "5")
-    (press-enter s)
+    (select-menu-item s "System")
     (assert-on-screen s "SYSTEM")
-    ;; Type "2" — should go to log screen
-    (move-cursor s 21 14)
-    (erase-eof s)
-    (type-text s "2")
-    (press-enter s)
+    ;; Select "Protokoll" — should go to log screen
+    (select-menu-item s "Protokoll")
     (assert-on-screen s "LOG")))
 
 ;;; Named navigation works from any screen

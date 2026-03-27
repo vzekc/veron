@@ -1,0 +1,15 @@
+(:name "cc-aussteller-detail"
+ :screen "
+
+Name......:
+Thema.....:
+Tische....:
+"
+ :fields ((:from (1 14) :len 50 :name name :intense t :color green)
+          (:from (2 14) :len 64 :name topic)
+          (:from (3 14) :len 30 :name table-list :color turquoise)
+          (:from (5 3) :len 75 :name bio-line :repeat 14))
+ :keys ((:pf3 "Zurueck" :back t)
+        (:pf4 "Exponate" :hidden t)
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

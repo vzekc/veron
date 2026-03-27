@@ -1,0 +1,15 @@
+(:name "cc"
+ :menu cc
+ :navigable t
+ :command t
+ :screen "
+
+   Aktuelle Veranstaltung:
+
+"
+ :fields ((:from (1 27) :len 50 :name exhibition-title :intense t :color yellow)
+          (:from (3 3) :len 3 :name key :color green :intense t :repeat 17)
+          (:from (3 8) :len 20 :name label :intense t :repeat 17)
+          (:from (3 29) :len 50 :name description :repeat 17))
+ :keys ((:enter "Waehlen")
+        (:pf3 "Zurueck" :back t)))

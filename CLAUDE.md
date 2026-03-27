@@ -18,7 +18,7 @@ VERON (V.z.E.k.C. Electronic Retro Online Network) is a Common Lisp 3270 termina
 (veron:start :port 3270 :host "127.0.0.1")
 ```
 
-Environment variables must be set (or present in `.env`): `VERON_DB_HOST`, `VERON_DB_PORT`, `VERON_DB_NAME`, `VERON_DB_USER`, `VERON_DB_PASSWORD`, `VERON_AUTH_DB_HOST`, `VERON_AUTH_DB_PORT`, `VERON_AUTH_DB_NAME`, `VERON_AUTH_DB_USER`, `VERON_AUTH_DB_PASSWORD`. Optional: `VERON_ADMIN_GROUPS`.
+Environment variables must be set (or present in `.env`): `VERON_DB_HOST`, `VERON_DB_PORT`, `VERON_DB_NAME`, `VERON_DB_USER`, `VERON_DB_PASSWORD`, `VERON_AUTH_DB_HOST`, `VERON_AUTH_DB_PORT`, `VERON_AUTH_DB_NAME`, `VERON_AUTH_DB_USER`, `VERON_AUTH_DB_PASSWORD`. Optional: `VERON_ADMIN_GROUPS`. For Classic Computing integration: `EXHIBITRON_DB_NAME` (required, if not set the CC menu shows "not configured"), `EXHIBITRON_DB_USER`, `EXHIBITRON_DB_PASSWORD`, `EXHIBITRON_DB_HOST`, `EXHIBITRON_DB_PORT` (these fall back to `VERON_DB_*` values).
 
 ## Architecture
 

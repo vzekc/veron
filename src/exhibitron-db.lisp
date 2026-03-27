@@ -9,15 +9,19 @@
 (defvar *exhibitron-db-params* nil
   "Postmodern connection parameters for the Exhibitron database.")
 
+(defun exhibitron-configured-p ()
+  "Return T if the exhibitron database is configured via environment variables."
+  (not (null (uiop:getenv "EXHIBITRON_DB_NAME"))))
+
 (defun exhibitron-db-params ()
   (or *exhibitron-db-params*
       (setf *exhibitron-db-params*
-            (let ((veron-params (db-params)))
-              (list "exhibitron"
-                    (second veron-params)
-                    (third veron-params)
-                    (fourth veron-params)
-                    :port (getf (nthcdr 4 veron-params) :port))))))
+            (list (env "EXHIBITRON_DB_NAME")
+                  (env "EXHIBITRON_DB_USER" (env "VERON_DB_USER"))
+                  (env "EXHIBITRON_DB_PASSWORD" (env "VERON_DB_PASSWORD"))
+                  (env "EXHIBITRON_DB_HOST" (env "VERON_DB_HOST"))
+                  :port (parse-integer
+                         (env "EXHIBITRON_DB_PORT" (env "VERON_DB_PORT")))))))
 
 (defmacro with-exhibitron-db (&body body)
   `(pomo:with-connection (exhibitron-db-params)

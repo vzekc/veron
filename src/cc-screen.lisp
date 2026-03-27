@@ -81,6 +81,10 @@ Returns a list of lines."
 ;;; CC menu screen - show current exhibition title
 
 (lispf:define-screen-update cc (exhibition-title)
+  (unless (exhibitron-configured-p)
+    (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
+          "Classic Computing nicht konfiguriert")
+    (return-from lispf:prepare-screen :back))
   (let* ((eid (cc-exhibition-id lispf:*session*))
          (detail (when eid (exhibitron-exhibition-detail eid))))
     (when detail

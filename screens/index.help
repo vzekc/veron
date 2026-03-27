@@ -1,0 +1,21 @@
+VERON Hilfe
+Willkommen bei VERON, dem V.z.E.k.C. Electronic Retro Online
+Network. VERON ist eine 3270-Terminalanwendung fuer Mitglieder
+des V.z.E.k.C. (Verein zum Erhalt klassischer Computer e.V.).
+
+THEMEN:
+  {vzekc:V.z.E.k.C.}    Der Verein
+  {veron:VERON}         Die Anwendung
+
+BEDIENUNG:
+  Menues:     Nummer eingeben und ENTER druecken
+  Befehle:    Befehlsname im Kommandofeld eingeben
+  PF3:        Zurueck / Abmelden (im Hauptmenue)
+  PF7/PF8:    Blaettern auf langen Seiten
+  PF1:        Hilfe (auf jedem Bildschirm)
+
+BEFEHLE:
+  hilfe       Diese Hilfe anzeigen
+  retrostar   RetroStar Netzwerk
+  gb          Gaestebuch
+  logout      Abmelden

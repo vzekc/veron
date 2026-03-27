@@ -1,0 +1,4 @@
+(:name "community"
+ :title "Community"
+ :items ((:key "1" :label "Chat" :description "Oeffentlicher Chat" :screen chat)
+         (:key "2" :label "Wer ist da?" :description "Aktive Sitzungen anzeigen" :screen who)))

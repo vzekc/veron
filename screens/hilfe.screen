@@ -1,0 +1,6 @@
+(:name "hilfe"
+ :anonymous t
+ :screen "
+"
+ :fields ()
+ :keys ((:pf3 "Zurueck" :back t)))

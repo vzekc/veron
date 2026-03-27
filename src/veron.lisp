@@ -333,10 +333,23 @@ confirmation message to avoid revealing whether the account exists."
 (defvar *logout-commands* '("logout" "logoff" "exit" "bye" "ende" "quit")
   "Commands that trigger the logout confirmation dialog.")
 
+(defvar *help-commands* '("hilfe" "help")
+  "Commands that open the help viewer.")
+
 (defmethod lispf:process-command ((app (eql *veron-app*)) (command string))
-  (if (member command *logout-commands* :test #'string-equal)
-      (confirm-logout)
-      (call-next-method)))
+  (cond
+    ((member command *logout-commands* :test #'string-equal)
+     (confirm-logout))
+    ((member command *help-commands* :test #'string-equal)
+     (lispf:show-help "index")
+     :stay)
+    (t (call-next-method))))
+
+;;; Help screen (subapplication handover)
+
+(lispf:define-screen-update hilfe ()
+  (lispf:show-help "index")
+  :back)
 
 ;;; Main screen
 

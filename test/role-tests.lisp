@@ -13,7 +13,7 @@
     ;; Navigate to system menu
     (move-cursor s 21 14)
     (erase-eof s)
-    (type-text s "7")
+    (type-text s "5")
     (press-enter s)
     (assert-on-screen s "SYSTEM")
     ;; Try to access users screen
@@ -37,7 +37,7 @@
       ;; Navigate to system → users
       (move-cursor s 21 14)
       (erase-eof s)
-      (type-text s "7")
+      (type-text s "5")
       (press-enter s)
       (assert-on-screen s "SYSTEM")
       (move-cursor s 21 14)

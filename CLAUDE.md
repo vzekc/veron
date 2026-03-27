@@ -41,6 +41,8 @@ Screen definitions use s-expression format (`.screen` and `.menu` files). The UI
 
 **Screen row numbering:** The `:screen` string starts with a newline after the opening `"`. The framework adds a header row (screen name, title, timestamp) at physical row 0 and renders the screen content starting at physical row 1. Field `:from` coordinates are relative to the screen content (row 0 = first line after the opening newline of the `:screen` string). Count rows carefully — the leading newline after `"` is consumed, so the first visible line of text is row 0 in the content but row 1 on the physical display.
 
+**Subapplication handover screens:** To invoke a subapplication (editor, help viewer) from a menu item, a minimal `.screen` file is required as a handover. The framework must load and register the screen before it can transition to it and call `prepare-screen`. The `.screen` file is minimal (just a name and empty content). The `define-screen-update` for that screen calls the subapplication (which blocks), then returns `:back` when done. Examples: `notes.screen` invokes the editor via `edit-file`; `hilfe.screen` invokes the help viewer via `show-help`.
+
 ### Database
 
 PostgreSQL with sequential migrations in `migrations/`. The migration runner in `db.lisp` tracks applied versions in a `schema_migrations` table.

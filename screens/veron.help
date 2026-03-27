@@ -1,0 +1,24 @@
+VERON - V.z.E.k.C. Electronic Retro Online Network
+VERON ist eine 3270-Terminalanwendung, die Benutzern von
+3270-Terminals einen Online-Zugang zur V.z.E.k.C.-Community
+bietet. Die Anwendung ist in Common Lisp geschrieben und
+laeuft auf SBCL (Steel Bank Common Lisp).
+
+TECHNISCHE GRUNDLAGEN:
+
+  LISPF - Lisp Interactive Screen Programming Facility
+    Ein Framework fuer interaktive 3270-Terminalanwendungen,
+    inspiriert von IBMs ISPF (Interactive System Productivity
+    Facility) und dem VM/CMS Fullscreen-Programmiermodell.
+    LISPF enthaelt einen integrierten Texteditor im Stil
+    von XEDIT.
+
+  CL3270
+    Eine Common-Lisp-Bibliothek fuer das IBM 3270 Data Stream
+    Protokoll, urspruenglich entwickelt von Marco Antoniotti
+    (Universita degli Studi di Milano-Bicocca).
+
+QUELLCODE:
+  VERON und LISPF sind Open Source und auf GitHub verfuegbar:
+    https://github.com/vzekc/veron
+    https://github.com/hanshuebner/lispf

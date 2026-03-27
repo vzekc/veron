@@ -13,7 +13,7 @@
     ;; Navigate to system submenu
     (move-cursor s 21 14)
     (erase-eof s)
-    (type-text s "7")
+    (type-text s "5")
     (press-enter s)
     (assert-on-screen s "SYSTEM")
     ;; Type "4" — system only has items 1-3, should show error
@@ -34,7 +34,7 @@
     ;; Navigate to system submenu
     (move-cursor s 21 14)
     (erase-eof s)
-    (type-text s "7")
+    (type-text s "5")
     (press-enter s)
     (assert-on-screen s "SYSTEM")
     ;; Type "2" — should go to log screen

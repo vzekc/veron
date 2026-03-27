@@ -1,4 +1,0 @@
-(:name "settings"
- :title "Einstellungen"
- :items ((:key "1" :label "Passwort" :description "Lokales Passwort aendern" :screen set-password)
-         (:key "2" :label "Meldungen" :description "Push-Benachrichtigungen" :screen notifications)))

@@ -1,0 +1,14 @@
+(:name "decnet"
+ :navigable t
+ :screen "
+
+     Benutzer     Bereich         Knoten
+"
+ :fields ((:from (2 1) :len 1 :name sel :write t :highlighting underscore :repeat 17)
+          (:from (2 5) :len 12 :name owner :intense t :color green :repeat 17)
+          (:from (2 18) :len 15 :name range :color turquoise :repeat 17)
+          (:from (2 34) :len 45 :name hosts :repeat 17)
+          (:from (19 1) :len 30 :name page-info :color turquoise))
+ :keys ((:pf3 "Zurueck" :back t)
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

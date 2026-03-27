@@ -1,0 +1,18 @@
+(:name "network"
+ :navigable t
+ :screen "
+
+     Besitzer     Name         Hardware           Vendor           Proto
+"
+ :fields ((:from (2 1) :len 1 :name sel :write t :highlighting underscore :repeat 17)
+          (:from (2 5) :len 12 :name owner :intense t :color green :repeat 17)
+          (:from (2 18) :len 12 :name name :repeat 17)
+          (:from (2 31) :len 18 :name hardware :color turquoise :repeat 17)
+          (:from (2 50) :len 16 :name vendor :repeat 17)
+          (:from (2 67) :len 12 :name protocols :repeat 17)
+          (:from (19 1) :len 30 :name page-info :color turquoise))
+ :keys ((:enter "Details")
+        (:pf3 "Zurueck" :back t)
+        (:pf5 "Alle" :hidden t)
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

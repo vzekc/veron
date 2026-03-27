@@ -1,0 +1,25 @@
+(:name "network-detail"
+ :screen "
+
+Besitzer..:
+Name......:
+MAC.......:
+Hardware..:
+Software..:
+Vendor....:
+DECnet....:
+Gesehen...:
+
+Protokolle:
+"
+ :fields ((:from (1 14) :len 30 :name owner :intense t :color green)
+          (:from (2 14) :len 30 :name name)
+          (:from (3 14) :len 20 :name mac :color turquoise)
+          (:from (4 14) :len 50 :name hardware)
+          (:from (5 14) :len 50 :name software)
+          (:from (6 14) :len 30 :name vendor)
+          (:from (7 14) :len 20 :name decnet :color yellow)
+          (:from (8 14) :len 20 :name last-seen)
+          (:from (11 3) :len 12 :name proto-name :color turquoise :repeat 7)
+          (:from (11 16) :len 60 :name proto-desc :repeat 7))
+ :keys ((:pf3 "Zurueck" :back t)))

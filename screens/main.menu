@@ -6,4 +6,5 @@
          (:key "4" :label "Editor" :description "LISPF Editor Demo" :screen notes)
          (:key "5" :label "Ueber" :description "Ueber VERON und den V.z.E.k.C." :screen about)
          (:key "6" :label "Einstellungen" :description "Passwort, Meldungen" :screen settings)
-         (:key "7" :label "System" :description "Aenderungen, Protokoll" :screen system)))
+         (:key "7" :label "System" :description "Aenderungen, Protokoll" :screen system)
+        (:key "8" :label "Netzwerk" :description "RetroStar Netzwerk" :screen retrostar)))

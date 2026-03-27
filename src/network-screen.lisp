@@ -16,12 +16,10 @@
                       (retrostar-active-hosts start (- end start)))))
     (values (loop for e in entries
                   for hw = (getf e :hardware)
-                  for vn = (getf e :vendor)
                   collect (list :owner (or (getf e :owner) "")
                                 :name (let ((n (getf e :name)))
                                         (if (db-null-p n) "" (or n "")))
                                 :hardware (if (or (null hw) (db-null-p hw)) "" hw)
-                                :vendor (if (or (null vn) (db-null-p vn)) "" vn)
                                 :protocols (or (format-protocols (getf e :protocols)) "")))
             total)))
 
@@ -72,12 +70,11 @@
               vendor (if (or (null vn) (db-null-p vn)) "" vn)
               decnet (or (mac-to-decnet mac-str) "")
               last-seen (if (or (null ls) (db-null-p ls)) "" (format-datetime ls))))
-      ;; Fill protocol detail repeat fields directly in the session context
+      ;; Fill protocol detail repeat fields via newline-separated base values
+      ;; (the framework's split-repeat-field-value splits on newlines)
       (let ((protos (retrostar-host-protocols-detail (getf entry :protocols)))
             (ctx (lispf:session-context lispf:*session*)))
-        (dotimes (i 7)
-          (if (< i (length protos))
-              (setf (gethash (format nil "proto-name.~D" i) ctx) (first (nth i protos))
-                    (gethash (format nil "proto-desc.~D" i) ctx) (second (nth i protos)))
-              (setf (gethash (format nil "proto-name.~D" i) ctx) ""
-                    (gethash (format nil "proto-desc.~D" i) ctx) "")))))))
+        (setf (gethash "proto-name" ctx)
+              (format nil "~{~A~^~%~}" (mapcar #'first protos))
+              (gethash "proto-desc" ctx)
+              (format nil "~{~A~^~%~}" (mapcar #'second protos)))))))

@@ -73,7 +73,7 @@ where addr = area*1024 + node."
 ;;; Host queries
 
 (defun retrostar-active-hosts (start count)
-  "Return active (seen in last 5 min) non-blacklisted hosts."
+  "Return active (seen in last 5 min) non-blacklisted hosts with a name."
   (with-retrostar-db
     (pomo:query
      "SELECT h.mac_address, u.name AS owner, h.name, h.hardware, h.software,
@@ -84,6 +84,7 @@ where addr = area*1024 + node."
       LEFT JOIN ethernet_vendor ev ON TRUNC(h.mac_address) = ev.mac_prefix
       WHERE h.last_seen > NOW() - INTERVAL '5 minutes'
         AND NOT h.blacklisted
+        AND h.name IS NOT NULL
       ORDER BY u.name, h.mac_address
       LIMIT $1 OFFSET $2"
      count start :plists)))
@@ -93,11 +94,12 @@ where addr = area*1024 + node."
     (pomo:query
      "SELECT COUNT(*) FROM host
       WHERE last_seen > NOW() - INTERVAL '5 minutes'
-        AND NOT blacklisted"
+        AND NOT blacklisted
+        AND name IS NOT NULL"
      :single)))
 
 (defun retrostar-all-hosts (start count)
-  "Return all non-blacklisted hosts."
+  "Return all non-blacklisted hosts with a name."
   (with-retrostar-db
     (pomo:query
      "SELECT h.mac_address, u.name AS owner, h.name, h.hardware, h.software,
@@ -107,6 +109,7 @@ where addr = area*1024 + node."
       JOIN \"user\" u ON h.user_id = u.id
       LEFT JOIN ethernet_vendor ev ON TRUNC(h.mac_address) = ev.mac_prefix
       WHERE NOT h.blacklisted
+        AND h.name IS NOT NULL
       ORDER BY u.name, h.mac_address
       LIMIT $1 OFFSET $2"
      count start :plists)))
@@ -114,7 +117,7 @@ where addr = area*1024 + node."
 (defun retrostar-all-host-count ()
   (with-retrostar-db
     (pomo:query
-     "SELECT COUNT(*) FROM host WHERE NOT blacklisted"
+     "SELECT COUNT(*) FROM host WHERE NOT blacklisted AND name IS NOT NULL"
      :single)))
 
 (defun retrostar-host-detail (mac-address)

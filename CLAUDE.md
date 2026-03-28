@@ -69,14 +69,15 @@ Tables: `users`, `logins`, `guestbook`, `files` (with BYTEA content and mime_typ
 
 ## CI and Testing
 
-**Running a single test:** Use `load-tests.lisp` (loads without running), then `run-tests`:
+**Running a single test:** Use `load-tests.lisp` (loads without running), then `run-tests`.
+The test package is auto-discovered from the registry — no `:package` needed:
 ```bash
 sbcl --non-interactive --load ~/quicklisp/setup.lisp --load load-tests.lisp \
-  --eval '(lispf-test:run-tests (quote test-name) :package :package-name)'
+  --eval '(lispf-test:run-tests (quote test-name))'
 ```
 Examples:
-- `(lispf-test:run-tests 'e2e-confirmation-confirm-logout :package :veron-tests)`
-- `(lispf-test:run-tests 'layout-default-page-size :package :lispf-editor-tests)`
+- `(lispf-test:run-tests 'e2e-confirmation-confirm-logout)`
+- `(lispf-test:run-tests 'layout-default-page-size)`
 
 Always run individual tests during development. Run the full suite before committing.
 

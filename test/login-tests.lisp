@@ -127,6 +127,12 @@
          (assert-on-screen s "SET-PASSWORD-OTP"))
     (setf (lispf:application-test-force-tls veron::*veron-app*) nil)))
 
+;;; Username with space
+
+(define-test e2e-login-username-with-space ()
+  (with-veron-app (s :username "test user" :password "testpass")
+    (login s "test user" "testpass")))
+
 ;;; Password field cleared after failed login attempt
 ;;; A long wrong password followed by a shorter correct password must work.
 ;;; Without clearing, remnants of the long password would corrupt the short one.

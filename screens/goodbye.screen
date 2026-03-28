@@ -21,5 +21,5 @@
               Vielen Dank fuer Deinen Besuch. Bis zum naechsten Mal!
 "
  :fields ((:from (16 18) :len 43 :intense t :color pink)
-          (:from (18 8) :len 55 :intense t :color turquoise))
+          (:from (18 13) :len 55 :intense t :color turquoise))
  :keys ((:pf3 "Trennen")))

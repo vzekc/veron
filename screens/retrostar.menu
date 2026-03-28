@@ -3,5 +3,5 @@
  :command t
  :items ((:key "1" :label "Aktive Rechner" :description "Rechner im Netz" :screen network)
          (:key "2" :label "DECnet-Adressen" :description "Adresszuordnungen Area 23" :screen decnet)
-         (:key "3" :label "Ereignisse" :description "Netzwerk-Ereignisse" :screen events)
+         (:key "3" :label "Ereignisse" :description "Netzwerk-Ereignisse" :screen netz-ereignisse)
          (:key "4" :label "Ueber" :description "Ueber RetroStar" :screen retrostar-about)))

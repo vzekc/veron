@@ -4,7 +4,7 @@
 
 (in-package #:veron)
 
-(lispf:define-list-data-getter events (start end)
+(lispf:define-list-data-getter netz-ereignisse (start end)
   (let* ((total (retrostar-event-count))
          (entries (retrostar-events start (- end start))))
     (values (loop for e in entries

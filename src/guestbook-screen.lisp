@@ -97,10 +97,11 @@
 
 (lispf:define-screen-update guestbook-new (author message)
   (let ((user (session-user lispf:*session*)))
-    (when user
-      (setf author (user-username user)))
-    (when user
-      (lispf:set-field-attribute "author" :write nil :intense t)))
+    (if user
+        (progn
+          (setf author (user-username user))
+          (lispf:set-field-attribute "author" :write nil :intense t))
+        (setf author "")))
   ;; Restore message from session property when returning from confirmation
   (let ((saved-message (lispf:session-property lispf:*session* :new-entry-message)))
     (when (and saved-message (string= message ""))

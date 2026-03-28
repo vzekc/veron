@@ -187,3 +187,31 @@
     (press-pf s 7)
     (assert-on-screen s "GUESTBOOK-ENTRY")))
 
+;;; Anonymous new entry should not show previous author
+
+(define-test e2e-guestbook-new-author-clear ()
+  (with-veron-app (s)
+    ;; Create an entry to browse
+    (veron::add-guestbook-entry "TestAuthor" "Test message")
+    ;; Navigate to guestbook from login screen
+    (press-pf s 4)
+    (assert-on-screen s "GUESTBOOK")
+    ;; View the entry
+    (move-cursor s 3 5)
+    (press-enter s)
+    (assert-on-screen s "GUESTBOOK-ENTRY")
+    (assert-screen-contains s "TestAuthor")
+    ;; Go back to list and create new entry
+    (press-pf s 3)
+    (assert-on-screen s "GUESTBOOK")
+    (press-pf s 5)
+    (assert-on-screen s "GUESTBOOK-NEW")
+    ;; Author field (physical row 2, col 12-41) must be blank
+    (let ((author (string-trim '(#\Space)
+                    (subseq (screen-row s 2) 12 42))))
+      (unless (string= author "")
+        (error 'test-failure
+               :description "Author field should be empty for anonymous new entry"
+               :expected "\"\""
+               :actual (format nil "~S" author))))))
+

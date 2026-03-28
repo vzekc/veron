@@ -88,6 +88,8 @@ Always run individual tests during development. Run the full suite before commit
 
 **ASDF picks up untracked files:** If an uncommitted `.asd` file or source file exists locally, ASDF will find and load it. CI won't have it. The worktree test script catches this.
 
+**Automated 3270 login:** When using the tn3270 tool to reproduce a system behavior outside of the login area, fill in the login screen with a sequence of String(<username>)Tab()String(<password>)Enter()Enter() to speed up the process and skip over the news page.
+
 ## MCP Integration
 
 The lisp-mcp tool provides `eval_swank` and `eval_host_cl` for evaluating Lisp expressions in a running image. The parameter name is `expression` (not `code`). Use `edit_lisp` for paredit-safe structural editing of Lisp source files.

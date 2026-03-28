@@ -330,20 +330,53 @@ confirmation message to avoid revealing whether the account exists."
                  (format nil "~A hat sich abgemeldet" (user-username user)))))
      'goodbye)))
 
-(defvar *logout-commands* '("logout" "logoff" "exit" "bye" "ende" "quit")
-  "Commands that trigger the logout confirmation dialog.")
+(lispf:define-command *veron-app* (logout)
+    (:aliases (logoff exit bye ende quit)
+     :doc "Abmelden")
+  (confirm-logout))
 
-(defvar *help-commands* '("hilfe" "help")
-  "Commands that open the help viewer.")
+(defun help-argument (command)
+  "Extract the argument after the first space in COMMAND, or NIL if bare command."
+  (let ((space (position #\Space command)))
+    (when space
+      (let ((arg (string-trim '(#\Space) (subseq command (1+ space)))))
+        (when (plusp (length arg))
+          arg)))))
 
-(defmethod lispf:process-command ((app (eql *veron-app*)) (command string))
-  (cond
-    ((member command *logout-commands* :test #'string-equal)
-     (confirm-logout))
-    ((member command *help-commands* :test #'string-equal)
-     (lispf:show-help "index")
-     :stay)
-    (t (call-next-method))))
+(defun show-command-help (arg)
+  "Display one-liner help for ARG in the error message field."
+  (let ((doc (lispf:find-command-doc *veron-app* arg)))
+    (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
+          (if doc
+              (format nil "~A - ~A" (string-upcase arg) doc)
+              (format nil "~A: Unbekannter Befehl" (string-upcase arg))))))
+
+(defun show-commands-help ()
+  "Display a browsable list of all commands in the help viewer."
+  (let* ((commands (lispf:collect-all-commands *veron-app*))
+         (lines (loop for (name doc aliases) in commands
+                      collect (list (format nil "  ~16A ~A~@[ (~{~A~^, ~})~]"
+                                            (string-upcase name) (or doc "")
+                                            (mapcar #'string-upcase aliases))))))
+    (lispf:show-help-page
+     (make-instance 'lispf:help-page
+                    :title "Verfuegbare Befehle"
+                    :lines lines))))
+
+(lispf:define-command *veron-app* (hilfe command)
+    (:aliases (help)
+     :doc "Hilfe anzeigen")
+  (let ((arg (help-argument command)))
+    (cond
+      ((null arg)
+       (lispf:show-help "index")
+       :stay)
+      ((member arg '("commands" "befehle") :test #'string-equal)
+       (show-commands-help)
+       :stay)
+      (t
+       (show-command-help arg)
+       :stay))))
 
 ;;; Help screen (subapplication handover)
 

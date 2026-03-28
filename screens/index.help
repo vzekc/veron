@@ -15,7 +15,7 @@ BEDIENUNG:
   PF1:        Hilfe (auf jedem Bildschirm)
 
 BEFEHLE:
-  hilfe       Diese Hilfe anzeigen
-  retrostar   RetroStar Netzwerk
-  gb          Gaestebuch
-  logout      Abmelden
+  hilfe              Diese Hilfe anzeigen
+  hilfe befehle      Alle verfuegbaren Befehle anzeigen
+  hilfe <befehl>     Hilfe zu einem bestimmten Befehl
+  logout             Abmelden

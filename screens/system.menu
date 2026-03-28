@@ -2,4 +2,5 @@
  :title "System"
  :items ((:key "1" :label "Aenderungen" :description "Neuigkeiten und Aenderungsprotokoll" :screen changelog)
          (:key "2" :label "Protokoll" :description "Anmeldeprotokoll" :screen log)
-         (:key "3" :label "Benutzer" :description "Benutzerverwaltung (nur Admins)" :screen users)))
+         (:key "3" :label "Benutzer" :description "Benutzerverwaltung (nur Admins)" :screen users)
+         (:key "4" :label "LU Konfig." :description "LU Konfiguration verwalten" :screen lu-config)))

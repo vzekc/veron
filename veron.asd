@@ -18,6 +18,7 @@
                              (:file "chat-screen")
                              (:file "changelog-screen")
                              (:file "users-screen")
+                             (:file "lu-config-screen")
                              (:file "retrostar-db")
                              (:file "network-screen")
                              (:file "decnet-screen")

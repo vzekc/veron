@@ -1,0 +1,20 @@
+(:name "lu-config"
+ :command t
+ :navigable t
+ :roles ("veron-administrator")
+ :screen "
+
+     LU Name          Beschreibung                Trennen  Einzeln  IP-Filter
+"
+ :fields ((:from (2 1) :len 1 :name sel :write t :highlighting underscore :repeat 17)
+          (:from (2 5) :len 16 :name name :intense t :color green :repeat 17)
+          (:from (2 22) :len 26 :name description :color turquoise :repeat 17)
+          (:from (2 52) :len 4 :name no-disconnect :color yellow :repeat 17)
+          (:from (2 59) :len 4 :name single-instance :color yellow :repeat 17)
+          (:from (2 66) :len 12 :name allowed-ips :repeat 17)
+          (:from (19 1) :len 30 :name page-info :color turquoise))
+ :keys ((:enter "Bearb.")
+        (:pf3 "Zurueck" :back t)
+        (:pf5 "Neu")
+        (:pf7 "Vor." :hidden t)
+        (:pf8 "Naech." :hidden t)))

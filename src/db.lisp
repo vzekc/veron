@@ -390,3 +390,95 @@ Numeric values: -1 = CET (UTC+1), -2 = CEST (UTC+2), etc.")
      "INSERT INTO chat_messages (channel_id, user_id, username, message, message_type)
       VALUES ($1, $2, $3, $4, $5) RETURNING id"
      channel-id user-id username message message-type :single)))
+
+;;; LU configuration
+
+(defun find-lu-config (name)
+  "Look up LU configuration by NAME, falling back to the * default.
+Queries the database directly each time."
+  (with-db
+    (or (first (pomo:query
+                "SELECT name, description, no_disconnect, single_instance, allowed_ips FROM lu_config
+                 WHERE name = $1" name :plists))
+        (first (pomo:query
+                "SELECT name, description, no_disconnect, single_instance, allowed_ips FROM lu_config
+                 WHERE name = '*'" :plists)))))
+
+(defun list-lu-configs (start count)
+  "Return a paginated list of LU configurations."
+  (with-db
+    (pomo:query
+     "SELECT name, description, no_disconnect, single_instance, allowed_ips FROM lu_config
+      ORDER BY name LIMIT $1 OFFSET $2"
+     count start :plists)))
+
+(defun lu-config-count ()
+  "Return the total number of LU configurations."
+  (with-db
+    (pomo:query "SELECT COUNT(*) FROM lu_config" :single)))
+
+(defun add-lu-config (name description no-disconnect single-instance allowed-ips)
+  "Insert a new LU configuration."
+  (with-db
+    (pomo:execute
+     "INSERT INTO lu_config (name, description, no_disconnect, single_instance, allowed_ips)
+      VALUES ($1, $2, $3, $4, $5)"
+     name description no-disconnect single-instance allowed-ips))
+)
+
+(defun update-lu-config (name description no-disconnect single-instance allowed-ips)
+  "Update an existing LU configuration."
+  (with-db
+    (pomo:execute
+     "UPDATE lu_config SET description = $2, no_disconnect = $3, single_instance = $4, allowed_ips = $5
+      WHERE name = $1"
+     name description no-disconnect single-instance allowed-ips))
+)
+
+(defun delete-lu-config (name)
+  "Delete an LU configuration and refresh the cache. Cannot delete the * default."
+  (when (string= name "*")
+    (error "Cannot delete default LU configuration"))
+  (with-db
+    (pomo:execute "DELETE FROM lu_config WHERE name = $1" name))
+)
+
+(defun parse-cidr (cidr-string)
+  "Parse a CIDR string like 192.168.1.0/24 into (values network-int mask-int).
+Returns NIL if the string is not a valid CIDR."
+  (let ((slash (position #\/ cidr-string)))
+    (unless slash (return-from parse-cidr nil))
+    (let* ((ip-part (subseq cidr-string 0 slash))
+           (mask-bits (parse-integer (subseq cidr-string (1+ slash)) :junk-allowed t))
+           (octets (split-sequence:split-sequence #\. ip-part)))
+      (unless (and mask-bits (<= 0 mask-bits 32) (= (length octets) 4))
+        (return-from parse-cidr nil))
+      (let ((ip-int (reduce (lambda (acc o)
+                              (+ (ash acc 8) (parse-integer o :junk-allowed t)))
+                            octets :initial-value 0))
+            (mask-int (if (zerop mask-bits) 0
+                          (ash (1- (ash 1 mask-bits)) (- 32 mask-bits)))))
+        (values ip-int mask-int)))))
+
+(defun ip-to-int (ip-string)
+  "Convert a dotted IP string to a 32-bit integer."
+  (let ((octets (split-sequence:split-sequence #\. ip-string)))
+    (when (= (length octets) 4)
+      (reduce (lambda (acc o)
+                (+ (ash acc 8) (parse-integer o :junk-allowed t)))
+              octets :initial-value 0))))
+
+(defun ip-matches-allowed-p (ip allowed-ips-string)
+  "Check if IP matches any CIDR entry in ALLOWED-IPS-STRING.
+Entries are comma or space separated. Empty string means no restriction (always matches)."
+  (when (or (null allowed-ips-string) (string= (string-trim '(#\Space) allowed-ips-string) ""))
+    (return-from ip-matches-allowed-p t))
+  (let ((ip-int (ip-to-int ip)))
+    (unless ip-int (return-from ip-matches-allowed-p nil))
+    (dolist (entry (split-sequence:split-sequence-if
+                    (lambda (c) (or (char= c #\,) (char= c #\Space)))
+                    allowed-ips-string :remove-empty-subseqs t))
+      (multiple-value-bind (net mask) (parse-cidr (string-trim '(#\Space) entry))
+        (when (and net mask (= (logand ip-int mask) (logand net mask)))
+          (return-from ip-matches-allowed-p t))))
+    nil))

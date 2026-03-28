@@ -1,0 +1,19 @@
+(:name "lu-config-new"
+ :roles ("veron-administrator")
+ :screen "
+
+   Neue LU Konfiguration
+
+   LU Name:
+   Beschreibung:
+   Kein Trennen:
+   Einzelinstanz:
+   Erlaubte IPs:
+"
+ :fields ((:from (3 22) :len 30 :name lu-name :write t)
+          (:from (4 22) :len 50 :name description :write t)
+          (:from (5 22) :len 1 :name no-disconnect :write t :highlighting underscore)
+          (:from (6 22) :len 1 :name single-instance :write t :highlighting underscore)
+          (:from (7 22) :len 50 :name allowed-ips :write t))
+ :keys ((:pf3 "Zurueck")
+        (:pf5 "Anlegen")))

@@ -71,6 +71,8 @@ Tables: `users`, `logins`, `guestbook`, `files` (with BYTEA content and mime_typ
 
 ## CI and Testing
 
+**No sleep in tests:** Never use `sleep` in test code. Use `wait-for-screen-contains` or `wait-for-screen-match` to poll for expected state instead.
+
 **Running a single test:** Use `load-tests.lisp` (loads without running), then `run-tests`.
 The test package is auto-discovered from the registry — no `:package` needed:
 ```bash

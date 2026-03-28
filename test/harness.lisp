@@ -105,13 +105,14 @@ Sets veron::*db-params* globally (so app threads see it) and restores on exit."
 
 ;;; Combined harness: test DB + VERON app + s3270
 
-(defmacro with-veron-app ((session-var &key (username "testuser") (password "testpass"))
+(defmacro with-veron-app ((session-var &key (username "testuser") (password "testpass") roles)
                            &body body)
   "Start a VERON instance with a fresh test database and s3270 session.
-Creates a test user with USERNAME/PASSWORD and binds SESSION-VAR to the s3270 session."
+Creates a test user with USERNAME/PASSWORD and binds SESSION-VAR to the s3270 session.
+ROLES is an optional list of keyword roles (e.g. (:veron-administrator))."
   (let ((db-name-var (gensym "DB-NAME")))
     `(with-test-db (,db-name-var)
-       (create-test-user ,username ,password)
+       (create-test-user ,username ,password ,@(when roles `(:roles ,roles)))
        (veron::load-chat-from-db)
        (with-test-app (,session-var veron::*veron-app*)
          ,@body))))

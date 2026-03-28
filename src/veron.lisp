@@ -26,7 +26,8 @@
    (login-id :initform nil :accessor session-login-id)
    (otp-username :initform nil :accessor session-otp-username)
    (otp-attempts :initform 0 :accessor session-otp-attempts)
-   (password-reset-sent :initform nil :accessor session-password-reset-sent)))
+   (password-reset-sent :initform nil :accessor session-password-reset-sent)
+   (lu-name :initform nil :accessor session-lu-name)))
 
 ;;; Application definition
 
@@ -55,6 +56,37 @@
                                  (user-username user)))))
     (when user
       (lispf:log-message :info "logout user=~A" (user-username user)))))
+
+;;; LU connection validation
+
+(defmethod lispf:validate-connection ((app (eql *veron-app*)) devinfo client-ip)
+  (let ((lu-name (cl3270:device-name devinfo)))
+    (unless lu-name
+      (return-from lispf:validate-connection t))
+    (let ((config (find-lu-config lu-name)))
+      (unless config
+        (return-from lispf:validate-connection
+          (format nil "unknown LU ~A from ~A" lu-name client-ip)))
+      (unless (ip-matches-allowed-p client-ip (getf config :allowed-ips))
+        (return-from lispf:validate-connection
+          (format nil "LU ~A not allowed from ~A" lu-name client-ip)))
+      (when (getf config :single-instance)
+        (bt:with-lock-held ((lispf::application-sessions-lock app))
+          (dolist (s (lispf::application-sessions app))
+            (when (equal lu-name (session-lu-name s))
+              (return-from lispf:validate-connection
+                (format nil "LU ~A already connected" lu-name)))))))
+    t))
+
+(defun session-lu-config ()
+  "Return the LU configuration for the current session, or NIL."
+  (when-let (lu-name (cl3270:device-name lispf:*device-info*))
+    (find-lu-config lu-name)))
+
+(defun session-no-disconnect-p ()
+  "Return T if the current session's LU has no-disconnect enabled."
+  (when-let (config (session-lu-config))
+    (getf config :no-disconnect)))
 
 ;;; Application customization
 
@@ -131,7 +163,10 @@
 
 (lispf:define-screen-update login (password password-label)
   (when (and lispf:*device-info* (string= "" (session-term-type lispf:*session*)))
-    (setf (session-term-type lispf:*session*) (cl3270::term-type lispf:*device-info*)))
+    (setf (session-term-type lispf:*session*) (cl3270::term-type lispf:*device-info*)
+          (session-lu-name lispf:*session*) (cl3270:device-name lispf:*device-info*)))
+  (when (session-no-disconnect-p)
+    (lispf:hide-key :pf3))
   (setf password "")
   (cond
     ((lispf:session-tls-p lispf:*session*)
@@ -328,7 +363,26 @@ confirmation message to avoid revealing whether the account exists."
        (when user
          (notify :logout "Abmeldung"
                  (format nil "~A hat sich abgemeldet" (user-username user)))))
-     'goodbye)))
+     (if (session-no-disconnect-p)
+         (progn
+           (reset-session lispf:*session*)
+           (cons :jump 'login))
+         'goodbye))))
+
+(defun reset-session (session)
+  "Reset session state for a new login cycle on a no-disconnect connection.
+Clears user, authentication, screen stack, and context while keeping
+the connection and LU name intact."
+  (let ((lu (session-lu-name session)))
+    (setf (session-user session) nil
+          (session-login-id session) nil
+          (session-otp-username session) nil
+          (session-otp-attempts session) 0
+          (session-password-reset-sent session) nil
+          (lispf:session-screen-stack session) nil
+          (lispf:session-context session) (make-hash-table :test 'equal))
+    ;; Preserve LU name across reset
+    (setf (session-lu-name session) lu)))
 
 (lispf:define-command *veron-app* (logout)
     (:aliases (logoff exit bye ende quit)
@@ -392,9 +446,15 @@ confirmation message to avoid revealing whether the account exists."
 ;;; Goodbye screen - display for 5 seconds, then disconnect
 
 (lispf:define-key-handler goodbye :pf3 ()
-  :logoff)
+  (if (session-no-disconnect-p)
+      (progn
+        (reset-session lispf:*session*)
+        (cons :jump 'login))
+      :logoff))
 
 (defmethod lispf:session-idle-timeout ((app (eql *veron-app*)) session)
+  (when (session-no-disconnect-p)
+    (return-from lispf:session-idle-timeout nil))
   (case (lispf:session-current-screen session)
     (login 60)
     (login-local 60)

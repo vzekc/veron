@@ -186,7 +186,7 @@
       FROM \"table\" t
       LEFT JOIN exhibitor er ON t.exhibitor_id = er.id
       LEFT JOIN \"user\" u ON er.user_id = u.id
-      WHERE t.exhibition_id = $1
+      WHERE t.exhibition_id = $1 AND t.exhibitor_id IS NOT NULL
       ORDER BY t.number
       LIMIT $2 OFFSET $3"
      exhibition-id count start :plists)))
@@ -194,5 +194,5 @@
 (defun exhibitron-table-count (exhibition-id)
   (with-exhibitron-db
     (pomo:query
-     "SELECT COUNT(*) FROM \"table\" WHERE exhibition_id = $1"
+     "SELECT COUNT(*) FROM \"table\" WHERE exhibition_id = $1 AND exhibitor_id IS NOT NULL"
      exhibition-id :single)))

@@ -35,6 +35,16 @@
     (select-menu-item s "Protokoll")
     (assert-on-screen s "LOG")))
 
+;;; PF1 on menu screen should open help, not show unknown key
+
+(define-test e2e-menu-pf1-opens-help ()
+  (with-veron-app (s :username "menuhelpuser" :password "menuhelppass")
+    (login s "menuhelpuser" "menuhelppass")
+    (assert-on-screen s "MAIN")
+    (press-key s :pf1)
+    (assert (not (wait-for-screen-contains s "Unbekannte Taste" :timeout 1))
+            () "PF1 should not show unknown key error on menu screens")))
+
 ;;; Named navigation works from any screen
 
 (define-test e2e-menu-named-navigation ()

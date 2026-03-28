@@ -587,16 +587,23 @@ If the changelog has unread entries, go to changelog; otherwise main."
   (lispf:log-message :info "deployment complete"))
 
 (defun start (&key (port 3270) (host "127.0.0.1")
-                    tls-port certificate-file key-file key-password (starttls t))
+                    tls-port tls-certificate-file tls-key-file key-password (starttls t))
   "Start the VERON application on PORT.
-When CERTIFICATE-FILE and KEY-FILE are provided, TLS is available.
+When TLS-CERTIFICATE-FILE and TLS-KEY-FILE are provided, TLS is available.
 TLS-PORT enables a dedicated TLS listener. STARTTLS (default T) offers
 STARTTLS negotiation on the plain port."
+  (when (or tls-certificate-file tls-key-file)
+    (unless (and tls-certificate-file tls-key-file)
+      (error "Both :tls-certificate-file and :tls-key-file must be provided"))
+    (unless (probe-file tls-certificate-file)
+      (error "TLS certificate file not found: ~A" tls-certificate-file))
+    (unless (probe-file tls-key-file)
+      (error "TLS key file not found: ~A" tls-key-file)))
   (deploy)
   (lispf:start-application *veron-app* :port port :host host
                            :tls-port tls-port
-                           :certificate-file certificate-file
-                           :key-file key-file
+                           :certificate-file tls-certificate-file
+                           :key-file tls-key-file
                            :key-password key-password
                            :starttls starttls))
 
@@ -632,8 +639,8 @@ Recognized variables (all optional, defaults in parentheses):
         (starttls (string-equal (env "VERON_STARTTLS" "true") "true")))
     (start :host host :port port
            :tls-port tls-port
-           :certificate-file cert
-           :key-file key
+           :tls-certificate-file cert
+           :tls-key-file key
            :key-password key-pw
            :starttls starttls)))
 

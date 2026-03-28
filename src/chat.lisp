@@ -149,30 +149,35 @@ EINER specifies the word for 1 (einer for feminine, einem for dative masculine).
               dow day month year hour min
               (format-silence-duration gap-seconds)))))
 
+(defun wrap-paragraph (text width)
+  "Wrap a single paragraph to WIDTH columns, returning a list of lines."
+  (let ((lines nil)
+        (len (length text))
+        (pos 0))
+    (loop while (< pos len)
+          do (let ((end (min (+ pos width) len)))
+               (if (<= end pos)
+                   (return)
+                   (if (>= end len)
+                       (progn (push (subseq text pos) lines)
+                              (setf pos len))
+                       (let ((break (position #\Space text :end end :from-end t :start pos)))
+                         (if (and break (> break pos))
+                             (progn (push (subseq text pos break) lines)
+                                    (setf pos (1+ break)))
+                             (progn (push (subseq text pos end) lines)
+                                    (setf pos end))))))))
+    (nreverse lines)))
+
 (defun word-wrap (text width)
-  "Wrap TEXT to WIDTH characters, breaking at word boundaries when possible.
-Returns a list of strings."
+  "Wrap TEXT to WIDTH columns, respecting existing newlines.
+Returns a list of lines."
   (when (zerop (length text))
     (return-from word-wrap (list "")))
-  (let ((lines '())
-        (pos 0)
-        (len (length text)))
-    (loop while (< pos len)
-          do (let ((remaining (- len pos)))
-               (if (<= remaining width)
-                   (progn
-                     (push (subseq text pos) lines)
-                     (setf pos len))
-                   (let* ((end (+ pos width))
-                          (break-pos (position #\Space text :end end :from-end t :start pos)))
-                     (if (and break-pos (> break-pos pos))
-                         (progn
-                           (push (subseq text pos break-pos) lines)
-                           (setf pos (1+ break-pos)))
-                         (progn
-                           (push (subseq text pos end) lines)
-                           (setf pos end)))))))
-    (nreverse lines)))
+  (loop for paragraph in (uiop:split-string text :separator '(#\Newline))
+        nconc (if (string= paragraph "")
+                  (list "")
+                  (wrap-paragraph paragraph width))))
 
 (defun wrap-message-lines (username message &key private)
   "Format a chat message into display lines with word wrapping.

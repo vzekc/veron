@@ -42,8 +42,7 @@
     (login s "menuhelpuser" "menuhelppass")
     (assert-on-screen s "MAIN")
     (press-key s :pf1)
-    (assert (not (wait-for-screen-contains s "Unbekannte Taste" :timeout 1))
-            () "PF1 should not show unknown key error on menu screens")))
+    (assert-on-screen s "HELP-VIEWER")))
 
 ;;; Named navigation works from any screen
 

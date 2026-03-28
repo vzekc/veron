@@ -50,34 +50,6 @@ key for tracking the scroll offset. Shows PF7/PF8 as needed."
   "Return VALUE as a string, or empty string if null/db-null."
   (if (or (null value) (db-null-p value)) "" value))
 
-(defun wrap-paragraph (text width)
-  "Wrap a single paragraph to WIDTH columns, returning a list of lines."
-  (let ((lines nil)
-        (len (length text))
-        (pos 0))
-    (loop while (< pos len)
-          do (let ((end (min (+ pos width) len)))
-               (if (<= end pos)
-                   (return)
-                   (if (>= end len)
-                       (progn (push (subseq text pos) lines)
-                              (setf pos len))
-                       (let ((break (position #\Space text :end end :from-end t :start pos)))
-                         (if (and break (> break pos))
-                             (progn (push (subseq text pos break) lines)
-                                    (setf pos (1+ break)))
-                             (progn (push (subseq text pos end) lines)
-                                    (setf pos end))))))))
-    (nreverse lines)))
-
-(defun word-wrap (text width)
-  "Wrap TEXT to WIDTH columns, respecting existing newlines.
-Returns a list of lines."
-  (loop for paragraph in (uiop:split-string text :separator '(#\Newline))
-        nconc (if (string= paragraph "")
-                  (list "")
-                  (wrap-paragraph paragraph width))))
-
 ;;; CC menu screen - show current exhibition title
 
 (lispf:define-screen-update cc (exhibition-title)

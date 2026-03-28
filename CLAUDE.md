@@ -43,6 +43,8 @@ Screen definitions use s-expression format (`.screen` and `.menu` files). The UI
 
 **Subapplication handover screens:** To invoke a subapplication (editor, help viewer) from a menu item, a minimal `.screen` file is required as a handover. The framework must load and register the screen before it can transition to it and call `prepare-screen`. The `.screen` file is minimal (just a name and empty content). The `define-screen-update` for that screen calls the subapplication (which blocks), then returns `:back` when done. Examples: `notes.screen` invokes the editor via `edit-file`; `hilfe.screen` invokes the help viewer via `show-help`.
 
+**List screens:** Screens that contain a list of items should normally have no command entry line and 18 data lines.
+
 ### Database
 
 PostgreSQL with sequential migrations in `migrations/`. The migration runner in `db.lisp` tracks applied versions in a `schema_migrations` table.

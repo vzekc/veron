@@ -8,16 +8,60 @@
 
 (in-package #:veron)
 
-;;; In-memory message store
+;;; Channel class
 
-(defvar *chat-messages* (make-hash-table)
-  "Channel ID -> vector of message plists, ordered oldest first.")
+(defclass chat-channel ()
+  ((id :initarg :id :reader channel-id)
+   (messages :initform (make-array 0 :adjustable t :fill-pointer 0)
+             :reader channel-messages-buffer)
+   (members :initform nil :accessor channel-members)
+   (lock :initform (bt:make-lock "chat-channel") :reader channel-lock)
+   (id-counter :initform 0 :accessor channel-id-counter)))
 
-(defvar *chat-lock* (bt:make-lock "chat")
-  "Lock protecting *chat-messages*.")
+;;; Channel registry
 
-(defvar *chat-id-counter* 0
-  "Monotonically increasing message ID for in-memory messages.")
+(defvar *chat-channels* (make-hash-table)
+  "Channel ID -> chat-channel instance.")
+
+(defvar *chat-channels-lock* (bt:make-lock "chat-channels")
+  "Lock protecting *chat-channels*.")
+
+(defun find-channel (id)
+  "Find a channel by ID, or NIL if not found."
+  (bt:with-lock-held (*chat-channels-lock*)
+    (gethash id *chat-channels*)))
+
+(defun find-or-create-channel (id)
+  "Find a channel by ID, creating it if it doesn't exist."
+  (bt:with-lock-held (*chat-channels-lock*)
+    (or (gethash id *chat-channels*)
+        (setf (gethash id *chat-channels*)
+              (make-instance 'chat-channel :id id)))))
+
+;;; Membership
+
+(defun join-channel (channel session username)
+  "Add SESSION to CHANNEL's member list. Idempotent."
+  (bt:with-lock-held ((channel-lock channel))
+    (unless (assoc session (channel-members channel))
+      (push (cons session username) (channel-members channel)))))
+
+(defun leave-channel (channel session)
+  "Remove SESSION from CHANNEL's member list. Idempotent."
+  (bt:with-lock-held ((channel-lock channel))
+    (setf (channel-members channel)
+          (remove session (channel-members channel) :key #'car))))
+
+(defun channel-user-names (channel)
+  "Return a sorted list of usernames in CHANNEL."
+  (let ((names (bt:with-lock-held ((channel-lock channel))
+                 (mapcar #'cdr (channel-members channel)))))
+    (sort names #'string-lessp)))
+
+(defun channel-member-count (channel)
+  "Return the number of members in CHANNEL."
+  (bt:with-lock-held ((channel-lock channel))
+    (length (channel-members channel))))
 
 (defun make-chat-message (type format &rest args)
   "Create a chat message plist with TYPE (:message or :notification) and formatted text."
@@ -34,9 +78,10 @@
   (eq (message-type msg) :notification))
 
 (defun load-chat-from-db ()
-  "Load all chat messages from the database into RAM."
+  "Load all chat messages from the database into channel instances."
   (dolist (channel-id (chat-channel-ids))
-    (let ((msgs (chat-channel-messages channel-id)))
+    (let ((channel (find-or-create-channel channel-id))
+          (msgs (chat-channel-messages channel-id)))
       (setf msgs
             (mapcar (lambda (msg)
                       (let ((mtype (getf msg :message-type)))
@@ -45,25 +90,19 @@
                                              :keyword)
                                msg)))
                     msgs))
-      (setf (gethash channel-id *chat-messages*)
+      (setf (slot-value channel 'messages)
             (make-array (length msgs)
                         :adjustable t :fill-pointer (length msgs)
                         :initial-contents msgs))
       (when msgs
-        (setf *chat-id-counter*
-              (max *chat-id-counter*
+        (setf (channel-id-counter channel)
+              (max (channel-id-counter channel)
                    (getf (car (last msgs)) :id)))))))
-
-(defun ensure-channel-buffer (channel-id)
-  "Ensure a message buffer exists for CHANNEL-ID."
-  (or (gethash channel-id *chat-messages*)
-      (setf (gethash channel-id *chat-messages*)
-            (make-array 0 :adjustable t :fill-pointer 0))))
 
 (defun channel-messages (channel-id)
   "Return the message vector for CHANNEL-ID."
-  (bt:with-lock-held (*chat-lock*)
-    (ensure-channel-buffer channel-id)))
+  (let ((channel (find-or-create-channel channel-id)))
+    (channel-messages-buffer channel)))
 
 ;;; Channel management
 
@@ -76,7 +115,8 @@
 (defun add-chat-entry (channel-id user type message)
   "Add a message to the shared buffer and persist to DB.
 TYPE is :message or :notification. Returns the message plist."
-  (let* ((type-string (string-downcase (symbol-name type)))
+  (let* ((channel (find-or-create-channel channel-id))
+         (type-string (string-downcase (symbol-name type)))
          (db-id (insert-chat-message channel-id (user-id user) (user-username user)
                                      message type-string))
          (msg (list* :id db-id
@@ -85,10 +125,10 @@ TYPE is :message or :notification. Returns the message plist."
                      :created-at (get-universal-time)
                      (when (eq type :message)
                        (list :username (user-username user))))))
-    (bt:with-lock-held (*chat-lock*)
-      (let ((buf (ensure-channel-buffer channel-id)))
-        (vector-push-extend msg buf))
-      (setf *chat-id-counter* (max *chat-id-counter* db-id)))
+    (bt:with-lock-held ((channel-lock channel))
+      (vector-push-extend msg (channel-messages-buffer channel))
+      (setf (channel-id-counter channel)
+            (max (channel-id-counter channel) db-id)))
     msg))
 
 (defun add-chat-message (channel-id user format &rest args)
@@ -357,18 +397,6 @@ Sets the PM flag in the chat indicator if the recipient is not viewing latest ch
            (setf (car delivered) t)))))
     (car delivered)))
 
-(defun broadcast-chat-notification (text &optional exclude-session)
-  "Insert a notification message into all chat users' per-session buffers.
-EXCLUDE-SESSION, if given, is skipped (used to suppress own enter/leave)."
-  (let ((msg (list :message text
-                   :created-at (get-universal-time)
-                   :notification t)))
-    (lispf:broadcast
-     (lambda ()
-       (when (and (eq (lispf:session-current-screen lispf:*session*) 'chat)
-                  (not (lispf:session-property lispf:*session* :chat-leaving))
-                  (not (eq lispf:*session* exclude-session)))
-         (vector-push-extend (copy-list msg) (user-chat-buffer)))))))
 
 (defun send-own-private-message (from-user to-username message raw-input)
   "Add a sent private message to the sender's own buffer."

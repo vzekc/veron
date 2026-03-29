@@ -86,6 +86,8 @@
                (not (lispf:session-property session :chat-leaving)))
       (let ((channel-id (default-channel-id)))
         (when channel-id
+          (alexandria:when-let (channel (find-channel channel-id))
+            (leave-channel channel session))
           (add-chat-notification channel-id user
                                  "--- ~A hat den Chat verlassen"
                                  (user-username user)))))
@@ -170,19 +172,20 @@
     (when users
       (let ((channel-id (default-channel-id)))
         (when channel-id
-          (dolist (user-pair users)
-            (destructuring-bind (user-id username) user-pair
-              (let* ((msg-text (format nil "--- ~A wurde getrennt (Neustart)" username))
-                     (db-id (insert-chat-message channel-id user-id username
-                                                 msg-text "notification"))
-                     (msg (list :id db-id
-                                :type :notification
-                                :message msg-text
-                                :created-at (get-universal-time))))
-                (bt:with-lock-held (*chat-lock*)
-                  (let ((buf (ensure-channel-buffer channel-id)))
-                    (vector-push-extend msg buf))
-                  (setf *chat-id-counter* (max *chat-id-counter* db-id))))))))
+          (let ((channel (find-or-create-channel channel-id)))
+            (dolist (user-pair users)
+              (destructuring-bind (user-id username) user-pair
+                (let* ((msg-text (format nil "--- ~A wurde getrennt (Neustart)" username))
+                       (db-id (insert-chat-message channel-id user-id username
+                                                   msg-text "notification"))
+                       (msg (list :id db-id
+                                  :type :notification
+                                  :message msg-text
+                                  :created-at (get-universal-time))))
+                  (bt:with-lock-held ((channel-lock channel))
+                    (vector-push-extend msg (channel-messages-buffer channel))
+                    (setf (channel-id-counter channel)
+                          (max (channel-id-counter channel) db-id)))))))))
       (lispf:log-message :info "closed ~D orphaned session~:P" (length users)))))
 
 ;;; Utility
@@ -695,8 +698,7 @@ If the changelog has unread entries, go to changelog; otherwise main."
   (lispf:log-message :info "running migrations")
   (initialize-db)
   (lispf:log-message :info "loading chat from DB")
-  (bt:with-lock-held (*chat-lock*)
-    (load-chat-from-db))
+  (load-chat-from-db)
   (lispf:log-message :info "loading message catalog")
   (lispf:set-message-catalog
    *veron-app*

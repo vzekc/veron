@@ -33,16 +33,8 @@
 
 (defun chat-user-names ()
   "Return a sorted list of usernames currently in the chat."
-  (let ((names '()))
-    (bt:with-lock-held ((lispf:application-connections-lock lispf:*application*))
-      (dolist (conn (lispf:application-connections lispf:*application*))
-        (let ((s (lispf:connection-session conn)))
-          (when (and s
-                     (typep s 'authenticated-session)
-                     (eq (lispf:session-current-screen s) 'chat)
-                     (not (lispf:session-property s :chat-leaving)))
-            (push (user-username (session-user s)) names)))))
-    (sort names #'string-lessp)))
+  (alexandria:when-let (channel (find-channel (chat-channel-id)))
+    (channel-user-names channel)))
 
 (defun format-chat-divider ()
   "Format the chat divider line showing usernames of users in chat.
@@ -75,14 +67,16 @@ Elides with '...' if names don't fit."
             (lispf:session-property lispf:*session* :chat-user-buffer) nil
             (lispf:session-property lispf:*session* :chat-sync-index) 0
             (lispf:session-property lispf:*session* :chat-sent-ids) nil))
-    (update-chat-indicators)
     (when entering
       (let ((name (current-username)))
         (when name
+          (join-channel (find-or-create-channel (chat-channel-id))
+                        lispf:*session* name)
           (add-chat-notification
            (chat-channel-id)
            (session-user lispf:*session*)
-           "--- ~A hat den Chat betreten" name)))))
+           "--- ~A hat den Chat betreten" name))))
+    (update-chat-indicators))
   (let ((total (length (chat-all-formatted-lines))))
     (when (> total +chat-display-lines+)
       (lispf:show-key :pf7 "Aeltere"))
@@ -165,6 +159,8 @@ runs right up to the boundary). Otherwise join with a single space."
         (channel-id (chat-channel-id)))
     (setf (lispf:session-property lispf:*session* :chat-leaving) t
           (lispf:session-property lispf:*session* :chat-entered) nil)
+    (alexandria:when-let (channel (find-channel channel-id))
+      (leave-channel channel lispf:*session*))
     (update-chat-indicators)
     (when name
       (add-chat-notification channel-id

@@ -34,12 +34,14 @@
 (defun chat-user-names ()
   "Return a sorted list of usernames currently in the chat."
   (let ((names '()))
-    (bt:with-lock-held ((lispf::application-sessions-lock lispf:*application*))
-      (dolist (s (lispf::application-sessions lispf:*application*))
-        (when (and (eq (lispf:session-current-screen s) 'chat)
-                   (not (lispf:session-property s :chat-leaving)))
-          (let ((user (session-user s)))
-            (when user (push (user-username user) names))))))
+    (bt:with-lock-held ((lispf:application-connections-lock lispf:*application*))
+      (dolist (conn (lispf:application-connections lispf:*application*))
+        (let ((s (lispf:connection-session conn)))
+          (when (and s
+                     (typep s 'authenticated-session)
+                     (eq (lispf:session-current-screen s) 'chat)
+                     (not (lispf:session-property s :chat-leaving)))
+            (push (user-username (session-user s)) names)))))
     (sort names #'string-lessp)))
 
 (defun format-chat-divider ()

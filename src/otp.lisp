@@ -110,8 +110,8 @@ On success, consumes the OTP and includes :otp-login t in the result."
 ;;; OTP verification
 
 (defun verify-otp (username code)
-  "Verify OTP code and complete login.
-Returns the screen to navigate to on success. Signals application-error on failure."
+  "Verify OTP code and signal session-reset on success.
+Signals application-error on failure."
   (let ((session lispf:*session*))
     (when (string= code "")
       (lispf:application-error "Bitte Einmalpasswort eingeben"))
@@ -133,36 +133,16 @@ Returns the screen to navigate to on success. Signals application-error on failu
     (let ((result (lookup-woltlab-user username)))
       (unless result
         (lispf:application-error "Benutzer nicht gefunden"))
-      (complete-login result)
-      'set-password-otp)))
+      (signal 'lispf:session-reset :data (append result (list :otp-login t))))))
 
 ;;; Local password login
 
 (defun login-with-local-password (username password)
-  "Authenticate with local password and complete login.
-Returns 'main on success. Signals application-error on failure."
+  "Authenticate with local password and signal session-reset on success.
+Signals application-error on failure."
   (when (or (string= username "") (string= password ""))
     (lispf:application-error "Bitte Benutzername und Passwort eingeben"))
   (let ((result (authenticate-local username password)))
     (unless result
       (lispf:application-error "Ungueltiges Passwort"))
-    (complete-login result)
-    (post-login-screen)))
-
-;;; Common login completion
-
-(defun complete-login (auth-result)
-  "Finalize login after successful authentication."
-  (let ((user (make-user auth-result)))
-    (setf (session-user lispf:*session*) user)
-    (ensure-db-user user)
-    (setf (session-login-id lispf:*session*)
-          (record-login user
-                        :terminal-type (session-term-type lispf:*session*)
-                        :tls (lispf:session-tls-p lispf:*session*)))
-    (lispf:log-message :info "login user=~A tls=~A"
-                      (user-username user)
-                      (if (lispf:session-tls-p lispf:*session*) "yes" "no"))
-    (notify :login "Anmeldung"
-            (format nil "~A hat sich angemeldet" (user-username user)))
-    (update-my-chat-indicator)))
+    (signal 'lispf:session-reset :data result)))

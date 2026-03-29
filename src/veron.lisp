@@ -17,17 +17,30 @@
           (mapcar (lambda (s) (string-trim '(#\Space) s))
                   (uiop:split-string groups-env :separator ",")))))
 
-;;; Session class
+;;; Connection class
+
+(defclass veron-connection (lispf:connection)
+  ((term-type :initform "" :accessor connection-term-type)
+   (connect-time :initform (get-universal-time) :reader connection-connect-time)
+   (lu-name :initform nil :accessor connection-lu-name)))
+
+;;; Session classes
 
 (defclass veron-session (lispf-editor:editor-session)
-  ((user :initform nil :accessor session-user)
-   (term-type :initform "" :accessor session-term-type)
-   (connect-time :initform (get-universal-time) :reader session-connect-time)
-   (login-id :initform nil :accessor session-login-id)
-   (otp-username :initform nil :accessor session-otp-username)
+  ())
+
+(defclass anonymous-session (veron-session)
+  ((otp-username :initform nil :accessor session-otp-username)
    (otp-attempts :initform 0 :accessor session-otp-attempts)
-   (password-reset-sent :initform nil :accessor session-password-reset-sent)
-   (lu-name :initform nil :accessor session-lu-name)))
+   (password-reset-sent :initform nil :accessor session-password-reset-sent)))
+
+(defclass authenticated-session (veron-session)
+  ((user :initarg :user :reader session-user)
+   (login-id :initform nil :accessor session-login-id)))
+
+(defmethod session-user ((session veron-session))
+  "Return NIL for non-authenticated sessions."
+  nil)
 
 ;;; Application definition
 
@@ -38,11 +51,33 @@
   :screen-directory (merge-pathnames
                      #P"screens/"
                      (asdf:system-source-directory :veron))
-  :session-class 'veron-session)
+  :session-class 'anonymous-session
+  :connection-class 'veron-connection)
+
+;;; Session factory
+
+(defmethod lispf:make-session ((app (eql *veron-app*)) connection data)
+  (if data
+      (let* ((user (make-user data))
+             (session (make-instance 'authenticated-session
+                                     :connection connection
+                                     :user user)))
+        (ensure-db-user user)
+        (setf (session-login-id session)
+              (record-login user
+                            :terminal-type (connection-term-type connection)
+                            :tls (lispf:connection-tls-p connection)))
+        (lispf:log-message :info "login user=~A tls=~A"
+                          (user-username user)
+                          (if (lispf:connection-tls-p connection) "yes" "no"))
+        (when (getf data :otp-login)
+          (setf (lispf:session-property session :otp-login) t))
+        session)
+      (make-instance 'anonymous-session :connection connection)))
 
 ;;; Session cleanup - called for all disconnection paths
 
-(defmethod lispf:session-cleanup ((app (eql *veron-app*)) session)
+(defmethod lispf:session-cleanup ((app (eql *veron-app*)) (session authenticated-session))
   (let ((login-id (session-login-id session))
         (user (session-user session)))
     (when login-id
@@ -71,9 +106,9 @@
         (return-from lispf:validate-connection
           (format nil "LU ~A not allowed from ~A" lu-name client-ip)))
       (when (getf config :single-instance)
-        (bt:with-lock-held ((lispf::application-sessions-lock app))
-          (dolist (s (lispf::application-sessions app))
-            (when (equal lu-name (session-lu-name s))
+        (bt:with-lock-held ((lispf:application-connections-lock app))
+          (dolist (conn (lispf:application-connections app))
+            (when (equal lu-name (connection-lu-name conn))
               (return-from lispf:validate-connection
                 (format nil "LU ~A already connected" lu-name)))))))
     t))
@@ -112,14 +147,16 @@
   (values "Auswahl" (if (equal menu-name "main") "Abmelden" "Zurueck")))
 
 (defmethod lispf:session-authenticated-p ((app (eql *veron-app*)) session)
-  (not (null (session-user session))))
+  (typep session 'authenticated-session))
 
 (defmethod lispf:anonymous-access-denied-message ((app (eql *veron-app*)))
   "Anmeldung erforderlich")
 
+(defmethod lispf:session-user-roles ((app (eql *veron-app*)) (session authenticated-session))
+  (effective-roles (session-user session)))
+
 (defmethod lispf:session-user-roles ((app (eql *veron-app*)) session)
-  (let ((user (session-user session)))
-    (when user (effective-roles user))))
+  nil)
 
 (defmethod lispf:role-access-denied-message ((app (eql *veron-app*)))
   "Keine Berechtigung")
@@ -162,33 +199,45 @@
 ;;; Login screen
 
 (lispf:define-screen-update login (password password-label)
-  (when (and lispf:*device-info* (string= "" (session-term-type lispf:*session*)))
-    (setf (session-term-type lispf:*session*) (cl3270::term-type lispf:*device-info*)
-          (session-lu-name lispf:*session*) (cl3270:device-name lispf:*device-info*)))
-  (when (session-no-disconnect-p)
-    (lispf:hide-key :pf3))
-  (setf password "")
-  (cond
-    ((lispf:session-tls-p lispf:*session*)
-     (setf password-label "Passwort:")
-     (lispf:show-key :pf2 "Passwort vergessen"))
-    (t
-     (setf password-label "")
-     (lispf:set-field-attribute "password" :write nil)
-     (unless (gethash "%errormsg" (lispf:session-context lispf:*session*))
-       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-             "Warnung: Verbindung ist nicht verschluesselt!")))))
+  (let ((conn (lispf:session-connection lispf:*session*)))
+    ;; Initialize connection-level state from device info on first display
+    (when (and lispf:*device-info* (string= "" (connection-term-type conn)))
+      (setf (connection-term-type conn) (cl3270::term-type lispf:*device-info*)
+            (connection-lu-name conn) (cl3270:device-name lispf:*device-info*)))
+    ;; If this is an authenticated session (created after login via session-reset),
+    ;; skip the login screen and go directly to post-login screen
+    (when (typep lispf:*session* 'authenticated-session)
+      (notify :login "Anmeldung"
+              (format nil "~A hat sich angemeldet"
+                      (user-username (session-user lispf:*session*))))
+      (update-my-chat-indicator)
+      (let ((otp-login-p (lispf:session-property lispf:*session* :otp-login)))
+        (return-from lispf::prepare-screen
+          (if otp-login-p 'set-password-otp (post-login-screen)))))
+    (when (session-no-disconnect-p)
+      (lispf:hide-key :pf3))
+    (setf password "")
+    (cond
+      ((lispf:connection-tls-p conn)
+       (setf password-label "Passwort:")
+       (lispf:show-key :pf2 "Passwort vergessen"))
+      (t
+       (setf password-label "")
+       (lispf:set-field-attribute "password" :write nil)
+       (unless (gethash "%errormsg" (lispf:session-context lispf:*session*))
+         (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
+               "Warnung: Verbindung ist nicht verschluesselt!"))))))
 
 (lispf:define-key-handler login :enter (username password)
   (when (string= username "")
     (lispf:application-error "Bitte Benutzername eingeben"))
-  (let ((tls-p (lispf:session-tls-p lispf:*session*)))
+  (let ((conn (lispf:session-connection lispf:*session*)))
     (cond
       ;; TLS: cursor on username row → move to password field
-      ((and tls-p (<= (lispf:cursor-row) 19) (string= password ""))
+      ((and (lispf:connection-tls-p conn) (<= (lispf:cursor-row) 19) (string= password ""))
        (lispf:next-input-field))
       ;; TLS: standard WoltLab login, also accepts valid OTP as password
-      (tls-p
+      ((lispf:connection-tls-p conn)
        (when (string= password "")
          (lispf:application-error "Bitte Passwort eingeben"))
        (let ((result (or (authenticate-local username password)
@@ -202,10 +251,7 @@
                          (authenticate-with-otp username password))))
          (unless result
            (lispf:application-error "Ungueltiger Benutzername oder Passwort"))
-         (complete-login result)
-         (if (getf result :otp-login)
-             'set-password-otp
-             (post-login-screen))))
+         (signal 'lispf:session-reset :data result)))
       ;; Non-TLS: user has local password
       ((has-local-password-p username)
        (setf (session-otp-username lispf:*session*) username)
@@ -359,30 +405,13 @@ confirmation message to avoid revealing whether the account exists."
   (lispf:request-confirmation
    "Wirklich abmelden?"
    (lambda ()
-     (let ((user (session-user lispf:*session*)))
-       (when user
+     (when (typep lispf:*session* 'authenticated-session)
+       (let ((user (session-user lispf:*session*)))
          (notify :logout "Abmeldung"
                  (format nil "~A hat sich abgemeldet" (user-username user)))))
      (if (session-no-disconnect-p)
-         (progn
-           (reset-session lispf:*session*)
-           (cons :jump 'login))
+         (signal 'lispf:session-reset)
          'goodbye))))
-
-(defun reset-session (session)
-  "Reset session state for a new login cycle on a no-disconnect connection.
-Clears user, authentication, screen stack, and context while keeping
-the connection and LU name intact."
-  (let ((lu (session-lu-name session)))
-    (setf (session-user session) nil
-          (session-login-id session) nil
-          (session-otp-username session) nil
-          (session-otp-attempts session) 0
-          (session-password-reset-sent session) nil
-          (lispf:session-screen-stack session) nil
-          (lispf:session-context session) (make-hash-table :test 'equal))
-    ;; Preserve LU name across reset
-    (setf (session-lu-name session) lu)))
 
 (lispf:define-command *veron-app* (logout)
     (:aliases (logoff exit bye ende quit)
@@ -447,9 +476,7 @@ the connection and LU name intact."
 
 (lispf:define-key-handler goodbye :pf3 ()
   (if (session-no-disconnect-p)
-      (progn
-        (reset-session lispf:*session*)
-        (cons :jump 'login))
+      (signal 'lispf:session-reset)
       :logoff))
 
 (defmethod lispf:session-idle-timeout ((app (eql *veron-app*)) session)

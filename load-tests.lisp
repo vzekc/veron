@@ -1,7 +1,7 @@
 ;;;; load-tests.lisp — Load test suites without running them.
 ;;;;
 ;;;; After loading, run individual tests with:
-;;;;   (lispf-test:run-tests 'test-name :package :package-name)
+;;;;   (lispf-test:run-tests :package-name 'test-name)
 ;;;; Then call (veron-tests::drop-template-db) to clean up.
 
 (defun setup-registry (directory-path)

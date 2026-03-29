@@ -74,14 +74,14 @@ Tables: `users`, `logins`, `guestbook`, `files` (with BYTEA content and mime_typ
 **No sleep in tests:** Never use `sleep` in test code. Use `wait-for-screen-contains` or `wait-for-screen-match` to poll for expected state instead.
 
 **Running a single test:** Use `load-tests.lisp` (loads without running), then `run-tests`.
-The test package is auto-discovered from the registry — no `:package` needed:
+The first argument is the package, followed by optional test names:
 ```bash
 sbcl --non-interactive --load ~/quicklisp/setup.lisp --load load-tests.lisp \
-  --eval '(lispf-test:run-tests (quote test-name))'
+  --eval '(lispf-test:run-tests :veron-tests (quote test-name))'
 ```
 Examples:
-- `(lispf-test:run-tests 'e2e-confirmation-confirm-logout)`
-- `(lispf-test:run-tests 'layout-default-page-size)`
+- `(lispf-test:run-tests :veron-tests 'e2e-confirmation-confirm-logout)`
+- `(lispf-test:run-tests :lispf-key-layout-tests 'layout-default-page-size)`
 
 Always run individual tests during development. Run the full suite before committing.
 

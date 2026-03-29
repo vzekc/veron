@@ -9,6 +9,7 @@ User=veron
 Group=veron
 WorkingDirectory=/opt/veron
 EnvironmentFile=/etc/veron/env
+ExecStartPre=/bin/bash -c 'rm -rf /home/veron/.cache/common-lisp/*/opt/veron/lispf'
 ExecStart=/usr/bin/sbcl --non-interactive \
     --load /home/veron/quicklisp/setup.lisp \
     --load load.lisp \

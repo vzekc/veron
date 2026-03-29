@@ -101,7 +101,7 @@
             (ts (getf entry :last-login)))
         (setf username (or (getf entry :name) "")
               email (if (db-null-p e-email) "" (or e-email ""))
-              admin (if (user-has-role-p entry :veron-administrator) "x" "")
+              admin (if (user-has-role-p entry :veron-administrator) "J" "N")
               last-login (if (or (null ts) (db-null-p ts))
                              "" (format-datetime ts))
               user-id (format nil "~D" (getf entry :id)))))

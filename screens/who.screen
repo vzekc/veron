@@ -3,7 +3,7 @@
  :aliases ("wer")
  :screen "
 
-  User             App      Screen          Idle     Connected  TLS
+  User             App      Screen          LU       Idle   Sinc   TLS
 "
  :fields ()
  :dynamic-areas ((:name sessions :from (2 0) :to (18 79)))

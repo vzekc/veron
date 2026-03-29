@@ -64,7 +64,7 @@
     (unless lu-name
       (return-from lispf:validate-connection t))
     (let ((config (find-lu-config lu-name)))
-      (unless config
+      (unless (and config (string= lu-name (getf config :name)))
         (return-from lispf:validate-connection
           (format nil "unknown LU ~A from ~A" lu-name client-ip)))
       (unless (ip-matches-allowed-p client-ip (getf config :allowed-ips))
@@ -505,8 +505,12 @@ the connection and LU name intact."
 ;;; Notification settings screen
 
 (defun field-enabled-p (value)
-  "Return T if a checkbox field value represents 'enabled' (any non-blank char)."
-  (and value (plusp (length (string-trim '(#\Space) value)))))
+  "Return T if VALUE is J, Y, or X (case-insensitive). N and space mean disabled."
+  (and value
+       (let ((trimmed (string-trim '(#\Space) value)))
+         (and (plusp (length trimmed))
+              (member (char-upcase (char trimmed 0)) '(#\J #\Y #\X))
+              t))))
 
 (defun event-checked (events event)
   "Return \"x\" if EVENT keyword is in the EVENTS list, empty string otherwise."

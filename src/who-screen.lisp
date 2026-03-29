@@ -14,11 +14,14 @@
                            (lispf:application-name active-app))
                        ""))
          (screen (string (lispf:session-current-screen session)))
-         (idle (format-duration (- now (lispf:session-last-activity session))))
+         (lu (let ((name (session-lu-name session)))
+               (if (or (null name) (string= name "*")) "" name)))
+         (idle-secs (- now (lispf:session-last-activity session)))
+         (idle (if (< idle-secs 60) "" (format-duration idle-secs)))
          (connected (format-duration (- now (session-connect-time session))))
          (tls (if (lispf:session-tls-p session) "Yes" "")))
-    (format nil "  ~16A ~8A ~15A ~8A ~10A ~A"
-            username app-name screen idle connected tls)))
+    (format nil "  ~16A ~8A ~15A ~8A ~6A ~6A ~A"
+            username app-name screen lu idle connected tls)))
 
 (lispf:define-dynamic-area-updater who sessions ()
   (let ((now (get-universal-time))

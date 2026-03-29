@@ -2,7 +2,7 @@
  :roles ("veron-administrator")
  :screen "
 
-   LU Konfiguration
+
 
    LU Name:
    Beschreibung:
@@ -10,7 +10,8 @@
    Einzelinstanz:
    Erlaubte IPs:
 "
- :fields ((:from (3 22) :len 30 :name lu-name)
+ :fields ((:from (1 3) :len 30 :name screen-title :intense t)
+          (:from (3 22) :len 30 :name lu-name)
           (:from (4 22) :len 50 :name description :write t)
           (:from (5 22) :len 1 :name no-disconnect :write t :highlighting underscore)
           (:from (6 22) :len 1 :name single-instance :write t :highlighting underscore)

@@ -210,11 +210,14 @@ When true, the tn3270 connection ends after logout instead of resetting to login
 ;;; Utility
 
 (defun format-duration (seconds)
-  "Format a duration in seconds as a human-readable string."
-  (let ((hours (floor seconds 3600))
-        (minutes (floor (mod seconds 3600) 60)))
+  "Format a duration in seconds as a human-readable string.
+Shows the single most significant unit: days, hours, or minutes."
+  (let ((days (floor seconds 86400))
+        (hours (floor seconds 3600))
+        (minutes (floor seconds 60)))
     (cond
-      ((>= hours 1) (format nil "~Dh ~Dm" hours minutes))
+      ((>= days 1) (format nil "~Dd" days))
+      ((>= hours 1) (format nil "~Dh" hours))
       ((>= minutes 1) (format nil "~Dm" minutes))
       (t "<1m"))))
 

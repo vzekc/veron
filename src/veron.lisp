@@ -54,6 +54,8 @@
   :session-class 'anonymous-session
   :connection-class 'veron-connection)
 
+(lispf:register-global-hotkey *veron-app* :pf12 'noti)
+
 ;;; Session factory
 
 (defmethod lispf:make-session ((app (eql *veron-app*)) connection data)
@@ -97,33 +99,50 @@
 ;;; LU connection validation
 
 (defmethod lispf:validate-connection ((app (eql *veron-app*)) devinfo client-ip)
-  (let ((lu-name (cl3270:device-name devinfo)))
-    (unless lu-name
-      (return-from lispf:validate-connection t))
-    (let ((config (find-lu-config lu-name)))
-      (unless (and config (string= lu-name (getf config :name)))
-        (return-from lispf:validate-connection
-          (format nil "unknown LU ~A from ~A" lu-name client-ip)))
-      (unless (ip-matches-allowed-p client-ip (getf config :allowed-ips))
-        (return-from lispf:validate-connection
-          (format nil "LU ~A not allowed from ~A" lu-name client-ip)))
-      (when (getf config :single-instance)
-        (bt:with-lock-held ((lispf:application-connections-lock app))
-          (dolist (conn (lispf:application-connections app))
-            (when (equal lu-name (connection-lu-name conn))
-              (return-from lispf:validate-connection
-                (format nil "LU ~A already connected" lu-name)))))))
+  (let* ((lu-name (cl3270:device-name devinfo))
+         (config (when lu-name (find-lu-config lu-name))))
+    (when (and lu-name (not config))
+      (return-from lispf:validate-connection
+        (format nil "unknown LU ~A from ~A" lu-name client-ip)))
+    (when (and lu-name config (not (string= lu-name (getf config :name))))
+      ;; find-lu-config fell back to DEFAULT — the requested LU doesn't exist
+      (return-from lispf:validate-connection
+        (format nil "unknown LU ~A from ~A" lu-name client-ip)))
+    ;; No LU specified: look up DEFAULT config if it exists
+    (unless config
+      (setf config (find-lu-config "DEFAULT"))
+      ;; If no DEFAULT config exists either, accept unconditionally
+      (unless config
+        (return-from lispf:validate-connection t)))
+    (unless (ip-matches-allowed-p client-ip (getf config :allowed-ips))
+      (return-from lispf:validate-connection
+        (format nil "LU ~A not allowed from ~A"
+                (or lu-name "DEFAULT") client-ip)))
+    (when (and (getf config :secure) (not (cl3270:tls-p devinfo)))
+      (return-from lispf:validate-connection
+        (format nil "LU ~A requires TLS from ~A"
+                (or lu-name "DEFAULT") client-ip)))
+    (when (and lu-name (getf config :single-instance))
+      (bt:with-lock-held ((lispf:application-connections-lock app))
+        (dolist (conn (lispf:application-connections app))
+          (when (equal lu-name (connection-lu-name conn))
+            (return-from lispf:validate-connection
+              (format nil "LU ~A already connected" lu-name))))))
     t))
 
 (defun session-lu-config ()
-  "Return the LU configuration for the current session, or NIL."
-  (when-let (lu-name (cl3270:device-name lispf:*device-info*))
-    (find-lu-config lu-name)))
+  "Return the LU configuration for the current session.
+Falls back to DEFAULT if no LU is specified."
+  (let ((lu-name (cl3270:device-name lispf:*device-info*)))
+    (find-lu-config (or lu-name "DEFAULT"))))
 
-(defun session-no-disconnect-p ()
-  "Return T if the current session's LU has no-disconnect enabled."
-  (when-let (config (session-lu-config))
-    (getf config :no-disconnect)))
+(defun session-disconnect-p ()
+  "Return T if the current session's LU has disconnect enabled.
+When true, the tn3270 connection ends after logout instead of resetting to login."
+  (let ((config (session-lu-config)))
+    (if config
+        (getf config :disconnect)
+        t)))
 
 ;;; Application customization
 
@@ -212,12 +231,13 @@
     (when (typep lispf:*session* 'authenticated-session)
       (notify :login "Anmeldung"
               (format nil "~A hat sich angemeldet"
-                      (user-username (session-user lispf:*session*))))
+                      (user-username (session-user lispf:*session*)))
+              :originator-user-id (user-id (session-user lispf:*session*)))
       (update-my-chat-indicator)
       (let ((otp-login-p (lispf:session-property lispf:*session* :otp-login)))
         (return-from lispf::prepare-screen
           (if otp-login-p 'set-password-otp (post-login-screen)))))
-    (when (session-no-disconnect-p)
+    (unless (session-disconnect-p)
       (lispf:hide-key :pf3))
     (setf password "")
     (cond
@@ -227,9 +247,8 @@
       (t
        (setf password-label "")
        (lispf:set-field-attribute "password" :write nil)
-       (unless (gethash "%errormsg" (lispf:session-context lispf:*session*))
-         (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-               "Warnung: Verbindung ist nicht verschluesselt!"))))))
+       (unless (lispf:session-property lispf:*session* :message-line)
+         (lispf:set-message :error "Warnung: Verbindung ist nicht verschluesselt!"))))))
 
 (lispf:define-key-handler login :enter (username password)
   (when (string= username "")
@@ -310,10 +329,7 @@ confirmation message to avoid revealing whether the account exists."
   (let ((session lispf:*session*))
     (setf username (or (session-otp-username session) "")
           otp-code "")
-    (when (not (gethash "%errormsg" (lispf:session-context session)))
-      (lispf:set-field-attribute "%errormsg" :color cl3270:+yellow+)
-      (setf (gethash "%errormsg" (lispf:session-context session))
-            "Falls ein Konto existiert, wurde eine E-Mail gesendet"))))
+    (lispf:set-message :confirmation "Falls ein Konto existiert, wurde eine E-Mail gesendet")))
 
 (lispf:define-key-handler login-otp :enter (otp-code)
   (verify-otp (session-otp-username lispf:*session*) otp-code))
@@ -327,9 +343,7 @@ confirmation message to avoid revealing whether the account exists."
   (let ((saved (lispf:session-property lispf:*session* :saved-password)))
     (setf new-password (or saved "")
           confirm-password ""))
-  (when (not (gethash "%errormsg" (lispf:session-context lispf:*session*)))
-    (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-          "Bitte lokales Passwort setzen")))
+  (lispf:set-message :confirmation "Bitte lokales Passwort setzen"))
 
 (lispf:define-key-handler set-password-otp :enter (new-password confirm-password)
   (if (and (<= (lispf:cursor-row) 19) (string= confirm-password ""))
@@ -347,8 +361,7 @@ confirmation message to avoid revealing whether the account exists."
           (lispf:application-error "Passwoerter stimmen nicht ueberein"))
         (let ((user (session-user lispf:*session*)))
           (save-local-password (user-id user) new-password)
-          (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-                "Passwort gespeichert"))
+          (lispf:set-message :confirmation "Passwort gespeichert"))
         (post-login-screen))))
 
 (lispf:define-key-handler set-password-otp :pf3 ()
@@ -394,8 +407,7 @@ confirmation message to avoid revealing whether the account exists."
        (lispf:application-error "Passwoerter stimmen nicht ueberein"))
      (let ((user (session-user lispf:*session*)))
        (save-local-password (user-id user) new-password)
-       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-             "Passwort gespeichert"))
+       (lispf:set-message :confirmation "Passwort gespeichert"))
      'main)))
 
 (lispf:define-key-handler set-password :pf3 ()
@@ -411,10 +423,11 @@ confirmation message to avoid revealing whether the account exists."
      (when (typep lispf:*session* 'authenticated-session)
        (let ((user (session-user lispf:*session*)))
          (notify :logout "Abmeldung"
-                 (format nil "~A hat sich abgemeldet" (user-username user)))))
-     (if (session-no-disconnect-p)
-         (signal 'lispf:session-reset)
-         'goodbye))))
+                 (format nil "~A hat sich abgemeldet" (user-username user))
+                 :originator-user-id (user-id user))))
+     (if (session-disconnect-p)
+         'goodbye
+         (signal 'lispf:session-reset)))))
 
 (lispf:define-command *veron-app* (logout)
     (:aliases (logoff exit bye ende quit)
@@ -432,10 +445,9 @@ confirmation message to avoid revealing whether the account exists."
 (defun show-command-help (arg)
   "Display one-liner help for ARG in the error message field."
   (let ((doc (lispf:find-command-doc *veron-app* arg)))
-    (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-          (if doc
-              (format nil "~A - ~A" (string-upcase arg) doc)
-              (format nil "~A: Unbekannter Befehl" (string-upcase arg))))))
+    (if doc
+        (lispf:set-message :confirmation "~A - ~A" (string-upcase arg) doc)
+        (lispf:set-message :error "~A: Unbekannter Befehl" (string-upcase arg)))))
 
 (defun show-commands-help ()
   "Display a browsable list of all commands in the help viewer."
@@ -478,12 +490,12 @@ confirmation message to avoid revealing whether the account exists."
 ;;; Goodbye screen - display for 5 seconds, then disconnect
 
 (lispf:define-key-handler goodbye :pf3 ()
-  (if (session-no-disconnect-p)
-      (signal 'lispf:session-reset)
-      :logoff))
+  (if (session-disconnect-p)
+      :logoff
+      (signal 'lispf:session-reset)))
 
 (defmethod lispf:session-idle-timeout ((app (eql *veron-app*)) session)
-  (when (session-no-disconnect-p)
+  (unless (session-disconnect-p)
     (return-from lispf:session-idle-timeout nil))
   (case (lispf:session-current-screen session)
     (login 60)
@@ -532,6 +544,35 @@ confirmation message to avoid revealing whether the account exists."
     (cleanup-tmp-file file-id)
     :back))
 
+;;; Dirty-check helpers for edit screens
+
+(defun snapshot-fields (&rest field-names)
+  "Save current values of FIELD-NAMES from the session context.
+Call from define-screen-enter after populating fields."
+  (let ((context (lispf:session-context lispf:*session*)))
+    (setf (lispf:session-property lispf:*session* :field-snapshot)
+          (loop for name in field-names
+                collect (cons name (gethash (string-downcase (string name)) context))))))
+
+(defun fields-dirty-p (&rest field-names)
+  "Return T if any of FIELD-NAMES differ from their snapshot values."
+  (let ((context (lispf:session-context lispf:*session*))
+        (snapshot (lispf:session-property lispf:*session* :field-snapshot)))
+    (loop for name in field-names
+          for key = (string-downcase (string name))
+          for current = (string-trim '(#\Space) (or (gethash key context) ""))
+          for saved = (string-trim '(#\Space) (or (cdr (assoc name snapshot :test #'string-equal)) ""))
+          thereis (string/= current saved))))
+
+(defun confirm-if-dirty (field-names callback)
+  "If any of FIELD-NAMES have changed since snapshot, ask for confirmation.
+Otherwise execute CALLBACK immediately."
+  (if (apply #'fields-dirty-p field-names)
+      (lispf:request-confirmation
+       "Aenderungen verwerfen?"
+       callback)
+      (funcall callback)))
+
 ;;; Notification settings screen
 
 (defun field-enabled-p (value)
@@ -542,51 +583,67 @@ confirmation message to avoid revealing whether the account exists."
               (member (char-upcase (char trimmed 0)) '(#\J #\Y #\X))
               t))))
 
-(defun event-checked (events event)
-  "Return \"x\" if EVENT keyword is in the EVENTS list, empty string otherwise."
-  (if (member event events) "x" ""))
+(defun setting-checked (settings event field)
+  "Return \"x\" if EVENT has FIELD enabled in SETTINGS alist, empty string otherwise."
+  (let ((entry (cdr (assoc event settings))))
+    (if (and entry (getf entry field)) "x" "")))
 
-(lispf:define-screen-update notifications
-    (topic evt-guestbook evt-login evt-logout)
+(defparameter *notification-field-names*
+  '(topic beep ntfy-guestbook local-guestbook ntfy-login local-login ntfy-logout local-logout))
+
+(lispf:define-screen-enter notifications
+    (topic beep ntfy-guestbook local-guestbook ntfy-login local-login ntfy-logout local-logout)
   (let* ((user (session-user lispf:*session*))
-         (subs (user-subscriptions (user-id user)))
-         (sub (first subs)))
-    (when sub
-      (let ((events (getf sub :events)))
-        (setf topic (getf sub :topic)
-              evt-guestbook (event-checked events :guestbook)
-              evt-login (event-checked events :login)
-              evt-logout (event-checked events :logout))))))
+         (uid (user-id user))
+         (settings (load-notification-settings uid)))
+    (setf topic (load-ntfy-topic uid)
+          beep (if (load-notification-beep uid) "x" "")
+          ntfy-guestbook (setting-checked settings :guestbook :ntfy)
+          local-guestbook (setting-checked settings :guestbook :local)
+          ntfy-login (setting-checked settings :login :ntfy)
+          local-login (setting-checked settings :login :local)
+          ntfy-logout (setting-checked settings :logout :ntfy)
+          local-logout (setting-checked settings :logout :local)))
+  (apply #'snapshot-fields *notification-field-names*))
+
+(lispf:define-key-handler notifications :pf3 ()
+  (confirm-if-dirty *notification-field-names* (lambda () :back)))
 
 (lispf:define-key-handler notifications :pf5
-    (topic evt-guestbook evt-login evt-logout)
+    (topic beep ntfy-guestbook local-guestbook ntfy-login local-login ntfy-logout local-logout)
   (let* ((user (session-user lispf:*session*))
-         (topic-name (string-trim '(#\Space) topic))
-         (events '()))
-    (when (field-enabled-p evt-guestbook)
-      (push :guestbook events))
-    (when (field-enabled-p evt-login)
-      (push :login events))
-    (when (field-enabled-p evt-logout)
-      (push :logout events))
-    ;; Delete existing subscriptions for this user
-    (dolist (sub (user-subscriptions (user-id user)))
-      (unsubscribe (getf sub :id) (user-id user)))
-    ;; Create new subscription if topic and events are set
-    (cond
-      ((and (string= topic-name "") (null events))
-       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-             "Benachrichtigungen deaktiviert"))
-      ((string= topic-name "")
-       (lispf:application-error "Bitte ntfy-Topic eingeben"))
-      ((null events)
-       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-             "Benachrichtigungen deaktiviert"))
-      (t
-       (subscribe (user-id user) topic-name (nreverse events))
-       (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-             "Gespeichert")))
+         (uid (user-id user))
+         (topic-name (string-trim '(#\Space) (or topic "")))
+         (has-ntfy (or (field-enabled-p ntfy-guestbook)
+                       (field-enabled-p ntfy-login)
+                       (field-enabled-p ntfy-logout))))
+    (when (and has-ntfy (string= topic-name ""))
+      (lispf:application-error "Bitte ntfy-Topic eingeben"))
+    (save-ntfy-topic uid topic-name)
+    (save-notification-beep uid (field-enabled-p beep))
+    (save-notification-setting uid :guestbook
+                               (field-enabled-p ntfy-guestbook)
+                               (field-enabled-p local-guestbook))
+    (save-notification-setting uid :login
+                               (field-enabled-p ntfy-login)
+                               (field-enabled-p local-login))
+    (save-notification-setting uid :logout
+                               (field-enabled-p ntfy-logout)
+                               (field-enabled-p local-logout))
+    (apply #'snapshot-fields *notification-field-names*)
+    (lispf:set-message :confirmation "Gespeichert")
     :stay))
+
+(lispf:define-key-handler notifications :pf9
+    (ntfy-guestbook local-guestbook ntfy-login local-login ntfy-logout local-logout)
+  (let ((any-on (or (field-enabled-p ntfy-guestbook) (field-enabled-p local-guestbook)
+                    (field-enabled-p ntfy-login) (field-enabled-p local-login)
+                    (field-enabled-p ntfy-logout) (field-enabled-p local-logout))))
+    (let ((val (if any-on "" "x")))
+      (setf ntfy-guestbook val local-guestbook val
+            ntfy-login val local-login val
+            ntfy-logout val local-logout val)))
+  :stay)
 
 ;;; Login log screen
 
@@ -691,6 +748,22 @@ If the changelog has unread entries, go to changelog; otherwise main."
        'changelog)
       (t 'main))))
 
+;;; Update cycle hook — notification delivery to error line and MSG indicator
+
+(defmethod lispf:update-cycle-hook ((app (eql *veron-app*)))
+  (deliver-notification-to-error-line))
+
+;;; Message cleared hook — mark notifications as read when user dismisses
+
+(defmethod lispf:message-cleared ((app (eql *veron-app*)) message)
+  (when (and (eq (getf message :type) :notification)
+             (typep lispf:*session* 'authenticated-session))
+    (let ((displayed-id (lispf:session-property lispf:*session* :notification-displayed-id)))
+      (when displayed-id
+        (mark-inbox-seen (user-id (session-user lispf:*session*)) displayed-id)
+        (setf (lispf:session-property lispf:*session* :notification-displayed-id) nil)
+        (update-notification-indicator)))))
+
 ;;; Server entry point
 
 (defun deploy ()
@@ -709,6 +782,8 @@ If the changelog has unread entries, go to changelog; otherwise main."
     (lispf:reload-all-screens)
     (lispf:load-application-menus *veron-app*))
   (close-orphaned-chat-sessions)
+  (lispf:log-message :info "starting notification delivery thread")
+  (start-delivery-thread)
   (log-deployment)
   (lispf:log-message :info "deployment complete"))
 

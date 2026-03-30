@@ -1,0 +1,12 @@
+(:name "noti"
+ :navigable t
+ :aliases ("nachrichten")
+ :screen "
+
+   Datum              Nachricht
+"
+ :dynamic-areas ((:name inbox :from (2 3) :to (19 78)))
+ :keys ((:enter "Gelesen")
+        (:pf3 "Zurueck" :back t)
+        (:pf5 "Alle gelesen")
+        (:pf9 "Alle loeschen")))

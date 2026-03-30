@@ -2,4 +2,4 @@
  :title "Persoenlich"
  :items ((:key "1" :label "Editor" :description "Notizen bearbeiten" :screen notes)
          (:key "2" :label "Passwort" :description "Lokales Passwort aendern" :screen set-password)
-         (:key "3" :label "Meldungen" :description "Push-Benachrichtigungen" :screen notifications)))
+         (:key "3" :label "Benachrichtigungen" :description "Benachrichtigungseinstellungen" :screen notifications)))

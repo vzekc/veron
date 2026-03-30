@@ -82,15 +82,13 @@
                     (next (first entries)))
                (cond
                  (next
-                  (setf (lispf:session-property lispf:*session* :browse-entry) next
-                        (gethash "%errormsg" (lispf:session-context lispf:*session*))
-                        "Eintrag geloescht")
+                  (setf (lispf:session-property lispf:*session* :browse-entry) next)
+                  (lispf:set-message :confirmation "Eintrag geloescht")
                   :stay)
                  (t
                   (setf (lispf:session-property lispf:*session* :browse-entry) nil
-                        (lispf:list-offset lispf:*session* 'guestbook) 0
-                        (gethash "%errormsg" (lispf:session-context lispf:*session*))
-                        "Eintrag geloescht")
+                        (lispf:list-offset lispf:*session* 'guestbook) 0)
+                  (lispf:set-message :confirmation "Eintrag geloescht")
                   :back))))))))))
 
 ;;; Guestbook new entry
@@ -137,15 +135,15 @@
     (when (and author message)
       (add-guestbook-entry author message)
       (notify :guestbook "Neuer Gaestebucheintrag"
-              (format nil "~A: ~A" author
-                      (subseq message 0 (min 100 (length message)))))
+              (format nil "Neuer Gaestebucheintrag von ~A" author)
+              :originator-user-id (when (typep lispf:*session* 'authenticated-session)
+                                    (user-id (session-user lispf:*session*))))
       (setf (lispf:session-property lispf:*session* :new-entry-author) nil)
       (setf (lispf:session-property lispf:*session* :new-entry-message) nil)
       ;; Reset list offset so the new entry is visible at the top
       (setf (lispf:list-offset lispf:*session* 'guestbook) 0)
       ;; Set confirmation message for the guestbook list
-      (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-            "Eintrag gespeichert")))
+      (lispf:set-message :confirmation "Eintrag gespeichert")))
   ;; Pop back past guestbook-new to the guestbook list
   (pop (lispf:session-screen-stack lispf:*session*))
   :back)

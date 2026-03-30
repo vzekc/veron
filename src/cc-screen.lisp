@@ -54,8 +54,7 @@ key for tracking the scroll offset. Shows PF7/PF8 as needed."
 
 (lispf:define-screen-update cc (exhibition-title)
   (unless (exhibitron-configured-p)
-    (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-          "Classic Computing nicht konfiguriert")
+    (lispf:set-message :error "Classic Computing nicht konfiguriert")
     (return-from lispf:prepare-screen :back))
   (let* ((eid (cc-exhibition-id lispf:*session*))
          (detail (when eid (exhibitron-exhibition-detail eid))))

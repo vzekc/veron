@@ -6,7 +6,7 @@
 
 ;;; Helper: create an LU with all fields via the UI
 
-(defun create-lu-via-ui (s lu-name &key description no-disconnect single-instance allowed-ips)
+(defun create-lu-via-ui (s lu-name &key description disconnect single-instance secure allowed-ips)
   "Navigate to the new LU screen from LU-CONFIG and fill in all fields.
 Presses PF5 to save. Uses Tab to navigate between fields."
   (press-pf s 5)
@@ -19,22 +19,35 @@ Presses PF5 to save. Uses Tab to navigate between fields."
   (when description
     (erase-eof s)
     (type-text s description))
-  ;; Tab to no-disconnect
+  ;; Tab to disconnect
   (tab-forward s)
-  (when no-disconnect
+  (when disconnect
     (erase-eof s)
-    (type-text s no-disconnect))
+    (type-text s disconnect))
   ;; Tab to single-instance
   (tab-forward s)
   (when single-instance
     (erase-eof s)
     (type-text s single-instance))
+  ;; Tab to secure
+  (tab-forward s)
+  (when secure
+    (erase-eof s)
+    (type-text s secure))
   ;; Tab to allowed-ips
   (tab-forward s)
   (when allowed-ips
     (erase-eof s)
     (type-text s allowed-ips))
   (press-pf s 5))
+
+;;; Helper: press PF3 and confirm discard if prompted
+
+(defun back-with-discard (s)
+  "Press PF3 and confirm discard if the unsaved-changes dialog appears."
+  (press-pf s 3)
+  (when (wait-for-screen-contains s "verwerfen" :timeout 1)
+    (press-pf s 5)))
 
 ;;; Helper: open an LU for editing from the list screen
 
@@ -66,8 +79,8 @@ Content col maps directly to physical col (data starts at the :from col)."
     ;; Navigate to System > LU Konfig
     (navigate-to s "LU-CONFIG")
     (assert-on-screen s "LU-CONFIG")
-    ;; Default * entry should be visible
-    (assert-screen-contains s "*")
+    ;; Default entry should be visible
+    (assert-screen-contains s "DEFAULT")
     ;; Create a new LU
     (create-lu-via-ui s "TESTLU01")
     (assert-on-screen s "LU-CONFIG")
@@ -95,7 +108,7 @@ Content col maps directly to physical col (data starts at the :from col)."
                        thereis (search "TESTLU01" (screen-row s r)))))
       (assert (not found) () "Deleted LU should not appear in list data"))))
 
-;;; Default LU (*) cannot be deleted
+;;; Default LU cannot be deleted
 
 (define-test e2e-lu-config-default-not-deletable ()
   (with-veron-app (s :username "luadmin2" :password "luadmin2pass"
@@ -103,11 +116,9 @@ Content col maps directly to physical col (data starts at the :from col)."
     (login s "luadmin2" "luadmin2pass")
     (navigate-to s "LU-CONFIG")
     (assert-on-screen s "LU-CONFIG")
-    ;; Select the * entry
-    (move-cursor s 3 5)
-    (press-enter s)
-    (assert-on-screen s "LU-CONFIG-EDIT")
-    (assert-screen-contains s "*")
+    ;; Select the DEFAULT entry
+    (open-lu-for-edit s "DEFAULT")
+    (assert-screen-contains s "DEFAULT")
     ;; PF9 should show error about default
     (press-pf s 9)
     (assert-screen-contains s "Standard LU")))
@@ -122,35 +133,38 @@ Content col maps directly to physical col (data starts at the :from col)."
     ;; Create LU with all fields populated
     (create-lu-via-ui s "FIELDLU"
                       :description "Test Beschreibung"
-                      :no-disconnect "J"
+                      :disconnect "J"
                       :single-instance "J"
                       :allowed-ips "192.168.1.0/24")
     (assert-on-screen s "LU-CONFIG")
     (assert-screen-contains s "FIELDLU")
-    ;; Verify list display: no-disconnect=J means "Nein" (kein Trennen = Nein means disconnect allowed)
-    ;; single-instance=J means "Ja"
+    ;; Verify list display: options column shows compact flags
     (let ((row (loop for r from 3 to 19
                      when (search "FIELDLU" (screen-row s r))
                        return r)))
       (assert row () "FIELDLU not found in list")
       (let ((row-text (screen-row s row)))
-        (assert (search "Nein" row-text) ()
-                "List should show Nein for no-disconnect=on, row: ~S" row-text)
-        (assert (search "Ja" row-text) ()
-                "List should show Ja for single-instance=on, row: ~S" row-text)))
+        (assert (search "DISC" row-text) ()
+                "List should show DISC for disconnect=on, row: ~S" row-text)
+        (assert (search "SINGLE" row-text) ()
+                "List should show SINGLE for single-instance=on, row: ~S" row-text)
+        (assert (search "IP:" row-text) ()
+                "List should show IP: for allowed-ips set, row: ~S" row-text)))
     ;; Open for editing and verify all fields
     (open-lu-for-edit s "FIELDLU")
     (let ((lu-name (read-edit-field s 3 22 30))
           (description (read-edit-field s 4 22 50))
-          (no-disconnect (read-edit-field s 5 22 1))
+          (disconnect (read-edit-field s 5 22 1))
           (single-instance (read-edit-field s 6 22 1))
-          (allowed-ips (read-edit-field s 7 22 50)))
+          (secure (read-edit-field s 7 22 1))
+          (allowed-ips (read-edit-field s 8 22 50)))
       (assert (string= lu-name "FIELDLU") () "LU name should be FIELDLU, got ~S" lu-name)
       (assert (string= description "Test Beschreibung") ()
               "Description should be Test Beschreibung, got ~S" description)
-      (assert (string= no-disconnect "J") () "No-disconnect should be J, got ~S" no-disconnect)
+      (assert (string= disconnect "J") () "Disconnect should be J, got ~S" disconnect)
       (assert (string= single-instance "J") ()
               "Single-instance should be J, got ~S" single-instance)
+      (assert (string= secure "N") () "Secure should default to N, got ~S" secure)
       (assert (string= allowed-ips "192.168.1.0/24") ()
               "Allowed-ips should be 192.168.1.0/24, got ~S" allowed-ips))
     ;; Clean up
@@ -173,7 +187,7 @@ Content col maps directly to physical col (data starts at the :from col)."
     (open-lu-for-edit s "TOGGLELU")
     (let ((si (read-edit-field s 6 22 1)))
       (assert (string= si "J") () "Single-instance should start as J, got ~S" si))
-    ;; Tab to single-instance (cursor on description, Tab to no-disconnect, Tab to single-instance)
+    ;; Tab to single-instance (cursor on description, Tab to disconnect, Tab to single-instance)
     (tab-forward s)
     (tab-forward s)
     (erase-eof s)
@@ -207,7 +221,7 @@ Content col maps directly to physical col (data starts at the :from col)."
     (let ((si (read-edit-field s 6 22 1)))
       (assert (string= si "J") () "Y should enable, display as J, got ~S" si))
     ;; Change to X, verify still enabled
-    ;; Tab to single-instance (cursor on description, Tab to no-disconnect, Tab to single-instance)
+    ;; Tab to single-instance (cursor on description, Tab to disconnect, Tab to single-instance)
     (tab-forward s)
     (tab-forward s)
     (erase-eof s)
@@ -219,7 +233,7 @@ Content col maps directly to physical col (data starts at the :from col)."
     (let ((si (read-edit-field s 6 22 1)))
       (assert (string= si "J") () "X should enable, display as J, got ~S" si))
     ;; Change to N, verify disabled
-    ;; Tab to single-instance (cursor on description, Tab to no-disconnect, Tab to single-instance)
+    ;; Tab to single-instance (cursor on description, Tab to disconnect, Tab to single-instance)
     (tab-forward s)
     (tab-forward s)
     (erase-eof s)
@@ -249,7 +263,8 @@ Content col maps directly to physical col (data starts at the :from col)."
     ;; Cursor on lu-name, type name
     (erase-eof s)
     (type-text s "BADIPLU")
-    ;; Tab to description, no-disconnect, single-instance, allowed-ips
+    ;; Tab to description, disconnect, single-instance, secure, allowed-ips
+    (tab-forward s)
     (tab-forward s)
     (tab-forward s)
     (tab-forward s)
@@ -261,8 +276,8 @@ Content col maps directly to physical col (data starts at the :from col)."
     (assert-on-screen s "LU-CONFIG-EDIT")
     (assert-screen-contains s "Ungueltige IP")
     (assert-screen-contains s "not-an-ip")
-    ;; Press PF3 to go back without saving
-    (press-pf s 3)
+    ;; Press PF3 to go back without saving (confirm discard)
+    (back-with-discard s)
     (assert-on-screen s "LU-CONFIG")
     ;; Verify LU was NOT created
     (let ((found (loop for r from 3 to 19
@@ -300,7 +315,8 @@ Content col maps directly to physical col (data starts at the :from col)."
     ;; Cursor on lu-name, type name
     (erase-eof s)
     (type-text s "MIXIPLU")
-    ;; Tab to description, no-disconnect, single-instance, allowed-ips
+    ;; Tab to description, disconnect, single-instance, secure, allowed-ips
+    (tab-forward s)
     (tab-forward s)
     (tab-forward s)
     (tab-forward s)
@@ -312,7 +328,7 @@ Content col maps directly to physical col (data starts at the :from col)."
     (assert-on-screen s "LU-CONFIG-EDIT")
     (assert-screen-contains s "Ungueltige IP")
     (assert-screen-contains s "bad")
-    (press-pf s 3)
+    (back-with-discard s)
     (assert-on-screen s "LU-CONFIG")))
 
 ;;; IP validation on edit screen
@@ -327,7 +343,8 @@ Content col maps directly to physical col (data starts at the :from col)."
     (assert-on-screen s "LU-CONFIG")
     ;; Edit and try to save with invalid IP
     (open-lu-for-edit s "EDITIPLU")
-    ;; Tab to allowed-ips (cursor on description, Tab 3x: no-disconnect, single-instance, allowed-ips)
+    ;; Tab to allowed-ips (cursor on description, Tab 4x: disconnect, single-instance, secure, allowed-ips)
+    (tab-forward s)
     (tab-forward s)
     (tab-forward s)
     (tab-forward s)
@@ -338,9 +355,9 @@ Content col maps directly to physical col (data starts at the :from col)."
     (assert-screen-contains s "Ungueltige IP")
     (assert-screen-contains s "garbage")
     ;; Go back and verify the LU still has no IPs
-    (press-pf s 3)
+    (back-with-discard s)
     (open-lu-for-edit s "EDITIPLU")
-    (let ((ips (read-edit-field s 7 22 50)))
+    (let ((ips (read-edit-field s 8 22 50)))
       (assert (string= ips "") () "IPs should still be empty, got ~S" ips))
     ;; Clean up
     (press-pf s 9)
@@ -373,6 +390,104 @@ Content col maps directly to physical col (data starts at the :from col)."
     (assert-screen-contains s "LU Konfiguration")
     (assert-screen-contains s "Speichern")
     ;; Clean up
+    (press-pf s 9)
+    (assert-screen-contains s "loeschen")
+    (press-pf s 5)
+    (wait-for-screen-contains s "geloescht" :timeout 3)))
+
+;;; Secure flag: create with secure=J, verify on edit and list
+
+(define-test e2e-lu-config-secure-flag ()
+  (with-veron-app (s :username "luadmin11" :password "luadmin11pass"
+                     :roles '(:veron-administrator))
+    (login s "luadmin11" "luadmin11pass")
+    (navigate-to s "LU-CONFIG")
+    ;; Create LU with secure enabled
+    (create-lu-via-ui s "SECURELU" :secure "J")
+    (assert-on-screen s "LU-CONFIG")
+    (assert-screen-contains s "SECURELU")
+    ;; Verify list shows "SSL" flag for secure
+    (let ((row (loop for r from 3 to 19
+                     when (search "SECURELU" (screen-row s r))
+                       return r)))
+      (assert row () "SECURELU not found in list")
+      (let ((row-text (screen-row s row)))
+        (assert (search "SSL" row-text) ()
+                "List should show SSL for secure=on, row: ~S" row-text)))
+    ;; Open for editing and verify secure field
+    (open-lu-for-edit s "SECURELU")
+    (let ((secure (read-edit-field s 7 22 1)))
+      (assert (string= secure "J") () "Secure should be J, got ~S" secure))
+    ;; Toggle secure to N
+    ;; Tab from description: disconnect, single-instance, secure
+    (tab-forward s)
+    (tab-forward s)
+    (tab-forward s)
+    (erase-eof s)
+    (type-text s "N")
+    (press-pf s 5)
+    (assert-screen-contains s "Gespeichert")
+    ;; Verify it persisted
+    (press-pf s 3)
+    (open-lu-for-edit s "SECURELU")
+    (let ((secure (read-edit-field s 7 22 1)))
+      (assert (string= secure "N") () "Secure should be N after toggle, got ~S" secure))
+    ;; Clean up
+    (press-pf s 9)
+    (assert-screen-contains s "loeschen")
+    (press-pf s 5)
+    (wait-for-screen-contains s "geloescht" :timeout 3)))
+
+;;; Secure flag defaults to N for new LU
+
+(define-test e2e-lu-config-secure-default ()
+  (with-veron-app (s :username "luadmin12" :password "luadmin12pass"
+                     :roles '(:veron-administrator))
+    (login s "luadmin12" "luadmin12pass")
+    (navigate-to s "LU-CONFIG")
+    ;; Create LU without specifying secure
+    (create-lu-via-ui s "DEFLU")
+    (assert-on-screen s "LU-CONFIG")
+    ;; Open for editing and verify secure defaults to N
+    (open-lu-for-edit s "DEFLU")
+    (let ((secure (read-edit-field s 7 22 1)))
+      (assert (string= secure "N") () "Secure should default to N, got ~S" secure))
+    ;; Clean up
+    (press-pf s 9)
+    (assert-screen-contains s "loeschen")
+    (press-pf s 5)
+    (wait-for-screen-contains s "geloescht" :timeout 3)))
+
+;;; LU name validation: must start with letter, alphanumeric only, auto-upcased
+
+(define-test e2e-lu-config-name-validation ()
+  (with-veron-app (s :username "luadmin13" :password "luadmin13pass"
+                     :roles '(:veron-administrator))
+    (login s "luadmin13" "luadmin13pass")
+    (navigate-to s "LU-CONFIG")
+    ;; Name starting with digit
+    (press-pf s 5)
+    (assert-screen-contains s "Neue LU Konfiguration")
+    (erase-eof s)
+    (type-text s "1BAD")
+    (press-pf s 5)
+    (assert-on-screen s "LU-CONFIG-EDIT")
+    (assert-screen-contains s "Buchstabe")
+    (back-with-discard s)
+    ;; Name with special characters
+    (press-pf s 5)
+    (erase-eof s)
+    (type-text s "BAD-LU")
+    (press-pf s 5)
+    (assert-on-screen s "LU-CONFIG-EDIT")
+    (assert-screen-contains s "Buchstaben und Ziffern")
+    (back-with-discard s)
+    ;; Lowercase name should be accepted (auto-upcased)
+    (create-lu-via-ui s "testlu")
+    (assert-on-screen s "LU-CONFIG")
+    (assert-screen-contains s "TESTLU")
+    ;; Clean up
+    (open-lu-for-edit s "TESTLU")
     (press-pf s 9)
     (assert-screen-contains s "loeschen")
     (press-pf s 5)

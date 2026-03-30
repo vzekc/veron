@@ -94,7 +94,9 @@
   "Return the current edit user entry from the database."
   (find-user-by-id (lispf:session-property lispf:*session* :edit-user-id)))
 
-(lispf:define-screen-update user-edit (username email admin last-login user-id)
+(defparameter *user-edit-field-names* '(email admin))
+
+(lispf:define-screen-enter user-edit (username email admin last-login user-id)
   (let ((entry (edit-user-entry)))
     (when entry
       (let ((e-email (getf entry :email))
@@ -104,13 +106,16 @@
               admin (if (user-has-role-p entry :veron-administrator) "J" "N")
               last-login (if (or (null ts) (db-null-p ts))
                              "" (format-datetime ts))
-              user-id (format nil "~D" (getf entry :id)))))
-    (lispf:show-key :pf5 "Speichern")
-    (lispf:show-key :pf6 "Passwort")
-    (lispf:show-key :pf9 "Loeschen")))
+              user-id (format nil "~D" (getf entry :id))))))
+  (apply #'snapshot-fields *user-edit-field-names*))
+
+(lispf:define-screen-update user-edit ()
+  (lispf:show-key :pf5 "Speichern")
+  (lispf:show-key :pf6 "Passwort")
+  (lispf:show-key :pf9 "Loeschen"))
 
 (lispf:define-key-handler user-edit :pf3 ()
-  :back)
+  (confirm-if-dirty *user-edit-field-names* (lambda () :back)))
 
 (lispf:define-key-handler user-edit :pf5 (email admin)
   (let* ((uid (lispf:session-property lispf:*session* :edit-user-id))
@@ -124,8 +129,8 @@
       (if (field-enabled-p admin)
           (add-user-role uid :veron-administrator)
           (remove-user-role uid :veron-administrator))
-      (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-            "Gespeichert"))
+      (apply #'snapshot-fields *user-edit-field-names*)
+      (lispf:set-message :confirmation "Gespeichert"))
     :stay))
 
 (lispf:define-key-handler user-edit :pf6 ()
@@ -137,8 +142,7 @@
      (format nil "Kennwort fuer ~A zuruecksetzen?" (getf entry :name))
      (lambda ()
        (let ((password (reset-user-password uid)))
-         (setf (gethash "%errormsg" (lispf:session-context lispf:*session*))
-               (format nil "Neues Passwort: ~A" password)))
+         (lispf:set-message :confirmation "Neues Passwort: ~A" password))
        :stay))))
 
 (lispf:define-key-handler user-edit :pf9 ()
@@ -153,9 +157,8 @@
      (format nil "Benutzer ~A loeschen?" (getf entry :name))
      (lambda ()
        (delete-user uid)
-       (setf (lispf:list-offset lispf:*session* 'users) 0
-             (gethash "%errormsg" (lispf:session-context lispf:*session*))
-             (format nil "Benutzer ~A geloescht" (getf entry :name)))
+       (setf (lispf:list-offset lispf:*session* 'users) 0)
+       (lispf:set-message :confirmation "Benutzer ~A geloescht" (getf entry :name))
        :back))))
 
 ;;; New user screen
@@ -178,7 +181,6 @@
       (lispf:application-error "Ungueltige E-Mail-Adresse"))
     (multiple-value-bind (user password) (create-local-user name mail)
       (declare (ignore user))
-      (setf (lispf:list-offset lispf:*session* 'users) 0
-            (gethash "%errormsg" (lispf:session-context lispf:*session*))
-            (format nil "Benutzer ~A angelegt - Passwort: ~A" name password))
+      (setf (lispf:list-offset lispf:*session* 'users) 0)
+      (lispf:set-message :confirmation "Benutzer ~A angelegt - Passwort: ~A" name password)
       :back)))

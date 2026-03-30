@@ -12,6 +12,7 @@
                              (:file "otp")
                              (:file "files")
                              (:file "notifications")
+                             (:file "notification-review-screen")
                              (:file "chat")
                              (:file "who-screen")
                              (:file "guestbook-screen")

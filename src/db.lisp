@@ -394,21 +394,21 @@ Numeric values: -1 = CET (UTC+1), -2 = CEST (UTC+2), etc.")
 ;;; LU configuration
 
 (defun find-lu-config (name)
-  "Look up LU configuration by NAME, falling back to the * default.
+  "Look up LU configuration by NAME, falling back to the DEFAULT entry.
 Queries the database directly each time."
   (with-db
     (or (first (pomo:query
-                "SELECT name, description, no_disconnect, single_instance, allowed_ips FROM lu_config
+                "SELECT name, description, disconnect, single_instance, allowed_ips, secure FROM lu_config
                  WHERE name = $1" name :plists))
         (first (pomo:query
-                "SELECT name, description, no_disconnect, single_instance, allowed_ips FROM lu_config
-                 WHERE name = '*'" :plists)))))
+                "SELECT name, description, disconnect, single_instance, allowed_ips, secure FROM lu_config
+                 WHERE name = 'DEFAULT'" :plists)))))
 
 (defun list-lu-configs (start count)
   "Return a paginated list of LU configurations."
   (with-db
     (pomo:query
-     "SELECT name, description, no_disconnect, single_instance, allowed_ips FROM lu_config
+     "SELECT name, description, disconnect, single_instance, allowed_ips, secure FROM lu_config
       ORDER BY name LIMIT $1 OFFSET $2"
      count start :plists)))
 
@@ -417,27 +417,25 @@ Queries the database directly each time."
   (with-db
     (pomo:query "SELECT COUNT(*) FROM lu_config" :single)))
 
-(defun add-lu-config (name description no-disconnect single-instance allowed-ips)
+(defun add-lu-config (name description disconnect single-instance allowed-ips secure)
   "Insert a new LU configuration."
   (with-db
     (pomo:execute
-     "INSERT INTO lu_config (name, description, no_disconnect, single_instance, allowed_ips)
-      VALUES ($1, $2, $3, $4, $5)"
-     name description no-disconnect single-instance allowed-ips))
-)
+     "INSERT INTO lu_config (name, description, disconnect, single_instance, allowed_ips, secure)
+      VALUES ($1, $2, $3, $4, $5, $6)"
+     name description disconnect single-instance allowed-ips secure)))
 
-(defun update-lu-config (name description no-disconnect single-instance allowed-ips)
+(defun update-lu-config (name description disconnect single-instance allowed-ips secure)
   "Update an existing LU configuration."
   (with-db
     (pomo:execute
-     "UPDATE lu_config SET description = $2, no_disconnect = $3, single_instance = $4, allowed_ips = $5
+     "UPDATE lu_config SET description = $2, disconnect = $3, single_instance = $4, allowed_ips = $5, secure = $6
       WHERE name = $1"
-     name description no-disconnect single-instance allowed-ips))
-)
+     name description disconnect single-instance allowed-ips secure)))
 
 (defun delete-lu-config (name)
-  "Delete an LU configuration and refresh the cache. Cannot delete the * default."
-  (when (string= name "*")
+  "Delete an LU configuration. Cannot delete the DEFAULT entry."
+  (when (string= name "DEFAULT")
     (error "Cannot delete default LU configuration"))
   (with-db
     (pomo:execute "DELETE FROM lu_config WHERE name = $1" name))

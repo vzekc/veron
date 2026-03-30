@@ -114,6 +114,7 @@ ROLES is an optional list of keyword roles (e.g. (:veron-administrator))."
     `(with-test-db (,db-name-var)
        (create-test-user ,username ,password ,@(when roles `(:roles ,roles)))
        (veron::load-chat-from-db)
+       (veron::ensure-delivery-thread)
        (with-test-app (,session-var veron::*veron-app*)
          ,@body))))
 
@@ -205,6 +206,13 @@ Must be used inside with-veron-app."
                 ,@body)
            (ignore-errors (s3270-disconnect ,s3270-var))
            (ignore-errors (close-s3270 ,s3270-var)))))))
+
+;;; LU config helpers
+
+(defun enable-default-disconnect ()
+  "Set the DEFAULT LU config to disconnect=true for tests that need the GOODBYE screen."
+  (veron::with-db
+    (pomo:execute "UPDATE lu_config SET disconnect = TRUE WHERE name = 'DEFAULT'")))
 
 ;;; Screen data
 

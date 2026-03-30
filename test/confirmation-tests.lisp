@@ -8,6 +8,7 @@
 
 (define-test e2e-confirmation-confirm-logout ()
   (with-veron-app (s :username "confloguser" :password "conflogpass")
+    (enable-default-disconnect)
     (login s "confloguser" "conflogpass")
     (assert-on-screen s "MAIN")
     ;; PF3 triggers confirmation

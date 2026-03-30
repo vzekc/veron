@@ -36,6 +36,7 @@
 
 (define-test e2e-logout-command ()
   (with-veron-app (s :username "cmdloguser" :password "cmdlogpass")
+    (enable-default-disconnect)
     (login s "cmdloguser" "cmdlogpass")
     (assert-on-screen s "MAIN")
     ;; Type "logout" in the command field
@@ -54,6 +55,7 @@
 
 (define-test e2e-logout-command-from-submenu ()
   (with-veron-app (s :username "subloguser" :password "sublogpass")
+    (enable-default-disconnect)
     (login s "subloguser" "sublogpass")
     (assert-on-screen s "MAIN")
     ;; Navigate to a submenu (guestbook)
@@ -74,6 +76,7 @@
 
 (define-test e2e-goodbye-farewell-color ()
   (with-veron-app (s :username "coloruser" :password "colorpass")
+    (enable-default-disconnect)
     (login s "coloruser" "colorpass")
     (assert-on-screen s "MAIN")
     (press-key s :pf3)

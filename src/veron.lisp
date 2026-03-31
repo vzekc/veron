@@ -901,6 +901,10 @@ Recognized variables (all optional, defaults in parentheses):
   "Hot-reload VERON code, run migrations, and refresh caches.
 Called via Swank during deployment. Existing sessions continue running."
   (lispf:log-message :info "hot-reload starting")
+  ;; Run migrations before code reload so new columns exist
+  ;; before new queries reference them
+  (lispf:log-message :info "running migrations")
+  (initialize-db)
   (dolist (sys '(:veron :lispf :lispf-edit :woltlab-login))
     (asdf:clear-system sys))
   (lispf:log-message :info "reloading code")

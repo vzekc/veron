@@ -74,6 +74,7 @@
                           (if (lispf:connection-tls-p connection) "yes" "no"))
         (when (getf data :otp-login)
           (setf (lispf:session-property session :otp-login) t))
+        (cache-lu-properties session)
         session)
       (make-instance 'anonymous-session :connection connection)))
 
@@ -104,7 +105,7 @@
     (when (and lu-name (not config))
       (return-from lispf:validate-connection
         (format nil "unknown LU ~A from ~A" lu-name client-ip)))
-    (when (and lu-name config (not (string= lu-name (getf config :name))))
+    (when (and lu-name config (not (string-equal lu-name (getf config :name))))
       ;; find-lu-config fell back to DEFAULT — the requested LU doesn't exist
       (return-from lispf:validate-connection
         (format nil "unknown LU ~A from ~A" lu-name client-ip)))
@@ -125,7 +126,7 @@
     (when (and lu-name (getf config :single-instance))
       (bt:with-lock-held ((lispf:application-connections-lock app))
         (dolist (conn (lispf:application-connections app))
-          (when (equal lu-name (connection-lu-name conn))
+          (when (string-equal lu-name (connection-lu-name conn))
             (return-from lispf:validate-connection
               (format nil "LU ~A already connected" lu-name))))))
     t))
@@ -143,6 +144,27 @@ When true, the tn3270 connection ends after logout instead of resetting to login
     (if config
         (getf config :disconnect)
         t)))
+
+(defun session-locked-p ()
+  "Return T if the current session's LU has locked enabled.
+Cached as a session property for efficiency."
+  (lispf:session-property lispf:*session* :lu-locked))
+
+(defun session-notify-all-p ()
+  "Return T if the current session's LU has notify_all enabled.
+Cached as a session property for efficiency."
+  (lispf:session-property lispf:*session* :lu-notify-all))
+
+(defun cache-lu-properties (session)
+  "Cache LU config flags on the session to avoid repeated DB lookups."
+  (let* ((lu-name (cl3270:device-name lispf:*device-info*))
+         (config (find-lu-config (or lu-name "DEFAULT"))))
+    (when config
+      (alexandria:when-let (init (getf config :init-screen))
+        (setf (lispf:session-property session :lu-init-screen)
+              (intern (string-upcase init) *package*)))
+      (setf (lispf:session-property session :lu-locked) (getf config :locked)
+            (lispf:session-property session :lu-notify-all) (getf config :notify-all)))))
 
 ;;; Application customization
 
@@ -181,6 +203,20 @@ When true, the tn3270 connection ends after logout instead of resetting to login
 
 (defmethod lispf:role-access-denied-message ((app (eql *veron-app*)))
   "Keine Berechtigung")
+
+(defmethod lispf:check-screen-transition ((app (eql *veron-app*)) result)
+  (let ((current (lispf:session-current-screen lispf:*session*))
+        (init (lispf:session-property lispf:*session* :lu-init-screen)))
+    (if (and (session-locked-p)
+             init
+             (eq current init)
+             (not (eq result :stay))
+             (not (null result))
+             (not (and (eq result :logoff) (session-disconnect-p))))
+        (progn
+          (lispf:set-message :error "Navigation gesperrt")
+          :stay)
+        result)))
 
 
 ;;; Orphaned session cleanup
@@ -227,8 +263,15 @@ Shows the single most significant unit: days, hours, or minutes."
   (let ((conn (lispf:session-connection lispf:*session*)))
     ;; Initialize connection-level state from device info on first display
     (when (and lispf:*device-info* (string= "" (connection-term-type conn)))
-      (setf (connection-term-type conn) (cl3270::term-type lispf:*device-info*)
-            (connection-lu-name conn) (cl3270:device-name lispf:*device-info*)))
+      (let ((lu (cl3270:device-name lispf:*device-info*)))
+        (setf (connection-term-type conn) (cl3270::term-type lispf:*device-info*)
+              (connection-lu-name conn) (when lu (string-upcase lu)))))
+    ;; LU with init_screen: bypass login entirely
+    (let ((config (session-lu-config)))
+      (alexandria:when-let (init-screen (and config (getf config :init-screen)))
+        (cache-lu-properties lispf:*session*)
+        (return-from lispf::prepare-screen
+          (intern (string-upcase init-screen) *package*))))
     ;; If this is an authenticated session (created after login via session-reset),
     ;; skip the login screen and go directly to post-login screen
     (when (typep lispf:*session* 'authenticated-session)
@@ -743,7 +786,12 @@ Returns T if an entry was added."
 
 (defun post-login-screen ()
   "Return the screen to navigate to after login.
-If the changelog has unread entries, go to changelog; otherwise main."
+If the LU has an init_screen configured, go there directly.
+Otherwise, if the changelog has unread entries, go to changelog; otherwise main."
+  (let ((config (session-lu-config)))
+    (alexandria:when-let (init-screen (and config (getf config :init-screen)))
+      (return-from post-login-screen
+        (intern (string-upcase init-screen) *package*))))
   (let ((user (session-user lispf:*session*)))
     (cond
       ((and user (changelog-unread-p (user-id user)))

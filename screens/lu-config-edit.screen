@@ -10,6 +10,10 @@
    Einzelinstanz:
    Nur SSL:
    Erlaubte IPs:
+
+   Init-Screen:
+   Gesperrt:
+   Alle Notif.:
 "
  :fields ((:from (1 3) :len 30 :name screen-title :intense t)
           (:from (3 22) :len 30 :name lu-name)
@@ -17,7 +21,10 @@
           (:from (5 22) :len 1 :name disconnect :write t :highlighting underscore)
           (:from (6 22) :len 1 :name single-instance :write t :highlighting underscore)
           (:from (7 22) :len 1 :name secure :write t :highlighting underscore)
-          (:from (8 22) :len 50 :name allowed-ips :write t))
+          (:from (8 22) :len 50 :name allowed-ips :write t)
+          (:from (10 22) :len 30 :name init-screen :write t)
+          (:from (11 22) :len 1 :name locked :write t :highlighting underscore)
+          (:from (12 22) :len 1 :name notify-all :write t :highlighting underscore))
  :keys ((:pf3 "Zurueck")
         (:pf5 "Speichern" :hidden t)
         (:pf9 "Loeschen" :hidden t)))

@@ -10,7 +10,7 @@
          (user (when (typep session 'authenticated-session)
                  (session-user session)))
          (active-app (when session (lispf:session-active-application session)))
-         (username (if user (user-username user) "(login)"))
+         (username (if user (user-username user) "(anonymous)"))
          (app-name (if active-app
                        (or (lispf:application-title active-app)
                            (lispf:application-name active-app))
@@ -23,6 +23,17 @@
          (tls (if (lispf:connection-tls-p conn) "Yes" "")))
     (format nil "  ~16A ~8A ~15A ~8A ~6A ~6A ~A"
             username app-name screen lu idle connected tls)))
+
+(lispf:define-screen-update who ()
+  (when (session-locked-p)
+    (if (session-disconnect-p)
+        (lispf:show-key :pf3 "Trennen")
+        (lispf:hide-key :pf3))))
+
+(lispf:define-key-handler who :pf3 ()
+  (if (and (session-locked-p) (session-disconnect-p))
+      :logoff
+      :back))
 
 (lispf:define-dynamic-area-updater who sessions ()
   (let ((now (get-universal-time))

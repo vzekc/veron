@@ -159,7 +159,8 @@ Returns an alist of (event-keyword . (:ntfy bool :local bool))."
   (let ((event (getf item :event))
         (title (getf item :title))
         (message (getf item :message))
-        (originator (getf item :originator)))
+        (originator (getf item :originator))
+        (delivered-users nil))
     (with-db
       (let ((settings (pomo:query
                        "SELECT ns.user_id, ns.ntfy, ns.local, u.ntfy_topic
@@ -177,8 +178,37 @@ Returns an alist of (event-keyword . (:ntfy bool :local bool))."
                     (lispf:log-message :error "ntfy delivery failed for user ~A: ~A"
                                        user-id e))))
               (when local-p
+                (push user-id delivered-users)
                 (add-to-inbox user-id event title message)
-                (deliver-to-session user-id)))))))))
+                (deliver-to-session user-id)))))))
+    (deliver-to-notify-all-sessions event title message originator delivered-users)))
+
+(defun deliver-to-notify-all-sessions (event title message originator delivered-users)
+  "Deliver to sessions on LUs with notify_all, bypassing per-user settings.
+DELIVERED-USERS is a list of user IDs already delivered to by the normal path."
+  (let ((app *veron-app*))
+    (bt:with-lock-held ((lispf:application-connections-lock app))
+      (dolist (conn (lispf:application-connections app))
+        (let* ((session (lispf:connection-session conn))
+               (lu-name (connection-lu-name conn)))
+          (when (and session lu-name
+                     (lispf:session-property session :lu-notify-all))
+            (if (typep session 'authenticated-session)
+                ;; Authenticated: use inbox + deliver-to-session
+                (let ((uid (user-id (session-user session))))
+                  (unless (or (and originator (= uid originator))
+                              (member uid delivered-users))
+                    (with-db
+                      (add-to-inbox uid event title message))
+                    (deliver-to-session uid)))
+                ;; Anonymous: deliver directly to session
+                (progn
+                  (setf (lispf:session-property session :notify-all-message) message
+                        (lispf:session-property session :notification-pending) t)
+                  (let ((lock (lispf:connection-update-lock conn))
+                        (cond (lispf:connection-update-cond conn)))
+                    (bt:with-lock-held (lock)
+                      (bt:condition-notify cond)))))))))))
 
 (defun deliver-to-session (user-id)
   "Push a pending notification signal to online sessions of USER-ID."
@@ -257,19 +287,29 @@ Call this from screen updates or after marking notifications as seen."
 Called from the update cycle hook in the session's update thread."
   (when (lispf:session-property lispf:*session* :notification-pending)
     (setf (lispf:session-property lispf:*session* :notification-pending) nil)
-    (when (typep lispf:*session* 'authenticated-session)
-      (let* ((uid (user-id (session-user lispf:*session*)))
-             (unseen (list-inbox uid :unseen-only t :limit 1)))
-        ;; Update NOTI indicator
-        (update-notification-indicator)
-        ;; Deliver to error line if no message is currently shown
-        (when (and unseen (not (lispf:session-property lispf:*session* :message-line)))
-          (let* ((entry (first unseen))
-                 (msg (or (getf entry :message) ""))
-                 (text (subseq msg 0 (min 79 (length msg))))
-                 (beep-p (load-notification-beep uid)))
-            (lispf:set-message :notification text)
-            (setf (lispf:session-property lispf:*session* :notification-displayed-id)
-                  (getf entry :id))
-            (lispf:send-error-line-overlay text :alarm beep-p
-                                             :color cl3270:+yellow+)))))))
+    (cond
+      ;; Authenticated session: use inbox
+      ((typep lispf:*session* 'authenticated-session)
+       (let* ((uid (user-id (session-user lispf:*session*)))
+              (unseen (list-inbox uid :unseen-only t :limit 1)))
+         (update-notification-indicator)
+         (when (and unseen (not (lispf:session-property lispf:*session* :message-line)))
+           (let* ((entry (first unseen))
+                  (msg (or (getf entry :message) ""))
+                  (text (subseq msg 0 (min 79 (length msg))))
+                  (beep-p (or (session-notify-all-p)
+                              (load-notification-beep uid))))
+             (lispf:set-message :notification text)
+             (setf (lispf:session-property lispf:*session* :notification-displayed-id)
+                   (getf entry :id))
+             (lispf:send-error-line-overlay text :alarm beep-p
+                                              :color cl3270:+yellow+)))))
+      ;; Anonymous notify-all session: deliver directly from session property
+      ((session-notify-all-p)
+       (alexandria:when-let (msg (lispf:session-property lispf:*session* :notify-all-message))
+         (setf (lispf:session-property lispf:*session* :notify-all-message) nil)
+         (unless (lispf:session-property lispf:*session* :message-line)
+           (let ((text (subseq msg 0 (min 79 (length msg)))))
+             (lispf:set-message :notification text)
+             (lispf:send-error-line-overlay text :alarm t
+                                              :color cl3270:+yellow+))))))))

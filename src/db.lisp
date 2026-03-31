@@ -393,45 +393,62 @@ Numeric values: -1 = CET (UTC+1), -2 = CEST (UTC+2), etc.")
 
 ;;; LU configuration
 
+(defun sanitize-plist (plist)
+  "Replace :null values with NIL in a plist."
+  (loop for (key value) on plist by #'cddr
+        collect key
+        collect (if (eq value :null) nil value)))
+
 (defun find-lu-config (name)
-  "Look up LU configuration by NAME, falling back to the DEFAULT entry.
-Queries the database directly each time."
+  "Look up LU configuration by NAME (case-insensitive), falling back to DEFAULT.
+Queries the database directly each time. SQL NULLs are converted to NIL."
   (with-db
-    (or (first (pomo:query
-                "SELECT name, description, disconnect, single_instance, allowed_ips, secure FROM lu_config
-                 WHERE name = $1" name :plists))
-        (first (pomo:query
-                "SELECT name, description, disconnect, single_instance, allowed_ips, secure FROM lu_config
-                 WHERE name = 'DEFAULT'" :plists)))))
+    (alexandria:when-let (row (or (first (pomo:query
+                                          "SELECT name, description, disconnect, single_instance, allowed_ips, secure,
+                                                  init_screen, locked, notify_all
+                                           FROM lu_config WHERE UPPER(name) = UPPER($1)" name :plists))
+                                  (first (pomo:query
+                                          "SELECT name, description, disconnect, single_instance, allowed_ips, secure,
+                                                  init_screen, locked, notify_all
+                                           FROM lu_config WHERE name = 'DEFAULT'" :plists))))
+      (sanitize-plist row))))
 
 (defun list-lu-configs (start count)
   "Return a paginated list of LU configurations."
   (with-db
-    (pomo:query
-     "SELECT name, description, disconnect, single_instance, allowed_ips, secure FROM lu_config
-      ORDER BY name LIMIT $1 OFFSET $2"
-     count start :plists)))
+    (mapcar #'sanitize-plist
+            (pomo:query
+             "SELECT name, description, disconnect, single_instance, allowed_ips, secure,
+                     init_screen, locked, notify_all
+              FROM lu_config ORDER BY name LIMIT $1 OFFSET $2"
+             count start :plists))))
 
 (defun lu-config-count ()
   "Return the total number of LU configurations."
   (with-db
     (pomo:query "SELECT COUNT(*) FROM lu_config" :single)))
 
-(defun add-lu-config (name description disconnect single-instance allowed-ips secure)
+(defun add-lu-config (name description disconnect single-instance allowed-ips secure
+                      &key init-screen locked notify-all)
   "Insert a new LU configuration."
   (with-db
     (pomo:execute
-     "INSERT INTO lu_config (name, description, disconnect, single_instance, allowed_ips, secure)
-      VALUES ($1, $2, $3, $4, $5, $6)"
-     name description disconnect single-instance allowed-ips secure)))
+     "INSERT INTO lu_config (name, description, disconnect, single_instance, allowed_ips, secure,
+                             init_screen, locked, notify_all)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+     name description disconnect single-instance allowed-ips secure
+     (or init-screen :null) (or locked nil) (or notify-all nil))))
 
-(defun update-lu-config (name description disconnect single-instance allowed-ips secure)
+(defun update-lu-config (name description disconnect single-instance allowed-ips secure
+                         &key init-screen locked notify-all)
   "Update an existing LU configuration."
   (with-db
     (pomo:execute
-     "UPDATE lu_config SET description = $2, disconnect = $3, single_instance = $4, allowed_ips = $5, secure = $6
+     "UPDATE lu_config SET description = $2, disconnect = $3, single_instance = $4,
+            allowed_ips = $5, secure = $6, init_screen = $7, locked = $8, notify_all = $9
       WHERE name = $1"
-     name description disconnect single-instance allowed-ips secure)))
+     name description disconnect single-instance allowed-ips secure
+     (or init-screen :null) (or locked nil) (or notify-all nil))))
 
 (defun delete-lu-config (name)
   "Delete an LU configuration. Cannot delete the DEFAULT entry."

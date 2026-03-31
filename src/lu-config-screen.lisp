@@ -17,6 +17,13 @@ If the result exceeds MAX-LEN, truncate and append *."
       (push "SINGLE" parts))
     (when (getf entry :secure)
       (push "SSL" parts))
+    (when (getf entry :locked)
+      (push "LOCK" parts))
+    (when (getf entry :notify-all)
+      (push "NTFY" parts))
+    (let ((init (getf entry :init-screen)))
+      (when (and init (not (string= init "")))
+        (push (format nil "INIT:~A" init) parts)))
     (let ((ips (getf entry :allowed-ips)))
       (when (and ips (not (string= ips "")))
         (push (format nil "IP:~A" ips) parts)))
@@ -70,26 +77,32 @@ or the first invalid entry string if validation fails."
   (find-lu-config-by-name (lispf:session-property lispf:*session* :edit-lu-name)))
 
 (defun find-lu-config-by-name (name)
-  "Look up exact LU configuration by name (no fallback to *)."
+  "Look up exact LU configuration by name, case-insensitive (no fallback)."
   (with-db
-    (first (pomo:query
-            "SELECT name, description, disconnect, single_instance, allowed_ips, secure
-               FROM lu_config WHERE name = $1" name :plists))))
+    (alexandria:when-let (row (first (pomo:query
+                                      "SELECT name, description, disconnect, single_instance, allowed_ips, secure,
+                                              init_screen, locked, notify_all
+                                       FROM lu_config WHERE UPPER(name) = UPPER($1)" name :plists)))
+      (sanitize-plist row))))
 
 (defun lu-config-new-p ()
   "Return T if the current LU config screen is in new mode."
   (not (lispf:session-property lispf:*session* :edit-lu-name)))
 
 (defparameter *lu-edit-field-names*
-  '(description disconnect single-instance allowed-ips secure))
+  '(description disconnect single-instance allowed-ips secure
+    init-screen locked notify-all))
 
 (lispf:define-screen-enter lu-config-edit
-    (screen-title lu-name description disconnect single-instance allowed-ips secure)
+    (screen-title lu-name description disconnect single-instance allowed-ips secure
+     init-screen locked notify-all)
   (if (lu-config-new-p)
       (setf screen-title "Neue LU Konfiguration"
             disconnect "N"
             single-instance "N"
-            secure "N")
+            secure "N"
+            locked "N"
+            notify-all "N")
       (let ((entry (edit-lu-entry)))
         (setf screen-title "LU Konfiguration")
         (when entry
@@ -98,7 +111,10 @@ or the first invalid entry string if validation fails."
                 disconnect (if (getf entry :disconnect) "J" "N")
                 single-instance (if (getf entry :single-instance) "J" "N")
                 allowed-ips (or (getf entry :allowed-ips) "")
-                secure (if (getf entry :secure) "J" "N")))))
+                secure (if (getf entry :secure) "J" "N")
+                init-screen (or (getf entry :init-screen) "")
+                locked (if (getf entry :locked) "J" "N")
+                notify-all (if (getf entry :notify-all) "J" "N")))))
   (apply #'snapshot-fields (if (lu-config-new-p)
                                (cons 'lu-name *lu-edit-field-names*)
                                *lu-edit-field-names*)))
@@ -131,35 +147,49 @@ Returns the upcased name, or signals an application error."
       (lispf:application-error "LU Name: nur Buchstaben und Ziffern"))
     upcased))
 
+(defun clean-init-screen (value)
+  "Clean and validate init-screen field value. Returns NIL for empty, lowercase string otherwise."
+  (let ((trimmed (string-trim '(#\Space) (or value ""))))
+    (when (plusp (length trimmed))
+      (string-downcase trimmed))))
+
 (lispf:define-key-handler lu-config-edit :pf5
-    (lu-name description disconnect single-instance allowed-ips secure)
+    (lu-name description disconnect single-instance allowed-ips secure
+     init-screen locked notify-all)
   (alexandria:when-let (bad-ip (validate-allowed-ips allowed-ips))
     (lispf:application-error (format nil "Ungueltige IP: ~A" bad-ip)))
-  (if (lu-config-new-p)
-      (let ((name (validate-lu-name lu-name)))
-        (when (find-lu-config-by-name name)
-          (lispf:application-error "LU existiert bereits"))
-        (add-lu-config name
-                       (string-trim '(#\Space) (or description ""))
-                       (field-enabled-p disconnect)
-                       (field-enabled-p single-instance)
-                       (string-trim '(#\Space) (or allowed-ips ""))
-                       (field-enabled-p secure))
-        (setf (lispf:list-offset lispf:*session* 'lu-config) 0)
-        (lispf:set-message :confirmation "LU ~A angelegt" name)
-        :back)
-      (let ((name (lispf:session-property lispf:*session* :edit-lu-name)))
-        (unless (find-lu-config-by-name name)
-          (lispf:application-error "LU Konfiguration nicht gefunden"))
-        (update-lu-config name
-                          (string-trim '(#\Space) (or description ""))
-                          (field-enabled-p disconnect)
-                          (field-enabled-p single-instance)
-                          (string-trim '(#\Space) (or allowed-ips ""))
-                          (field-enabled-p secure))
-        (apply #'snapshot-fields *lu-edit-field-names*)
-        (lispf:set-message :confirmation "Gespeichert")
-        :stay)))
+  (let ((init (clean-init-screen init-screen)))
+    (if (lu-config-new-p)
+        (let ((name (validate-lu-name lu-name)))
+          (when (find-lu-config-by-name name)
+            (lispf:application-error "LU existiert bereits"))
+          (add-lu-config name
+                         (string-trim '(#\Space) (or description ""))
+                         (field-enabled-p disconnect)
+                         (field-enabled-p single-instance)
+                         (string-trim '(#\Space) (or allowed-ips ""))
+                         (field-enabled-p secure)
+                         :init-screen init
+                         :locked (field-enabled-p locked)
+                         :notify-all (field-enabled-p notify-all))
+          (setf (lispf:list-offset lispf:*session* 'lu-config) 0)
+          (lispf:set-message :confirmation "LU ~A angelegt" name)
+          :back)
+        (let ((name (lispf:session-property lispf:*session* :edit-lu-name)))
+          (unless (find-lu-config-by-name name)
+            (lispf:application-error "LU Konfiguration nicht gefunden"))
+          (update-lu-config name
+                            (string-trim '(#\Space) (or description ""))
+                            (field-enabled-p disconnect)
+                            (field-enabled-p single-instance)
+                            (string-trim '(#\Space) (or allowed-ips ""))
+                            (field-enabled-p secure)
+                            :init-screen init
+                            :locked (field-enabled-p locked)
+                            :notify-all (field-enabled-p notify-all))
+          (apply #'snapshot-fields *lu-edit-field-names*)
+          (lispf:set-message :confirmation "Gespeichert")
+          :stay))))
 
 (lispf:define-key-handler lu-config-edit :pf9 ()
   (when (lu-config-new-p)

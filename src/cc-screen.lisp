@@ -6,7 +6,7 @@
 
 ;;; Helpers
 
-(defparameter *default-exhibition-id* 1
+(defparameter *default-exhibition-id* 2
   "Default exhibition ID. CC 2025 = 1, CC 2026 = 2.")
 
 (defun cc-exhibition-id (session)

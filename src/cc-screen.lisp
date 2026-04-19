@@ -11,10 +11,9 @@
 
 (defun cc-exhibition-id (session)
   "Return the currently selected exhibition ID, defaulting to *default-exhibition-id*."
-  (or (lispf:session-property session :cc-exhibition-id)
-      (let ((id *default-exhibition-id*))
-        (setf (lispf:session-property session :cc-exhibition-id) id)
-        id)))
+  (setf (lispf:session-property session :cc-exhibition-id)
+        (or (lispf:session-property session :cc-exhibition-id)
+            *default-exhibition-id*)))
 
 ;;; Scrollable text display via repeat fields
 
@@ -56,10 +55,8 @@ key for tracking the scroll offset. Shows PF7/PF8 as needed."
   (unless (exhibitron-configured-p)
     (lispf:set-message :error "Classic Computing nicht konfiguriert")
     (return-from lispf:prepare-screen :back))
-  (let* ((eid (cc-exhibition-id lispf:*session*))
-         (detail (when eid (exhibitron-exhibition-detail eid))))
-    (when detail
-      (setf exhibition-title (safe-string (getf detail :title))))))
+  (when-let (detail (exhibitron-exhibition-detail (cc-exhibition-id lispf:*session*)))
+    (setf exhibition-title (safe-string (getf detail :title)))))
 
 ;;; Exhibition selection screen
 
@@ -74,15 +71,11 @@ key for tracking the scroll offset. Shows PF7/PF8 as needed."
             total)))
 
 (lispf:define-key-handler cc-auswahl :enter ()
-  (let ((index (lispf:selected-list-index)))
-    (when index
-      (let* ((exhibitions (exhibitron-exhibitions))
-             (entry (nth index exhibitions)))
-        (when entry
-          (setf (lispf:session-property lispf:*session* :cc-exhibition-id)
-                (getf entry :id)
-                (lispf:session-property lispf:*session* :force-redraw) t)
-          :back)))))
+  (when-let (index (lispf:selected-list-index))
+    (when-let (entry (nth index (exhibitron-exhibitions)))
+      (setf (lispf:session-property lispf:*session* :cc-exhibition-id) (getf entry :id)
+            (lispf:session-property lispf:*session* :force-redraw) t)
+      :back)))
 
 ;;; Exhibitor list
 

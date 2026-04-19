@@ -163,19 +163,18 @@ EINER specifies the word for 1 (einer for feminine, einem for dative masculine).
       (format nil "~A ~A" (number-to-german n) plural)))
 
 (defun format-silence-duration (gap-seconds)
-  "Format a gap duration in German words."
+  "Format a gap duration in German words, showing only the largest non-zero unit."
   (let* ((total-minutes (floor gap-seconds 60))
          (days (floor total-minutes (* 24 60)))
          (hours (floor (mod total-minutes (* 24 60)) 60))
          (minutes (mod total-minutes 60))
-         (parts '()))
-    (when (plusp minutes)
-      (push (german-unit minutes "Minute" "Minuten") parts))
-    (when (plusp hours)
-      (push (german-unit hours "Stunde" "Stunden") parts))
-    (when (plusp days)
-      (push (german-unit days "Tag" "Tagen" :einer "einem") parts))
-    (format nil "nach ~{~A~^, ~} Stille" parts)))
+         (part (cond ((plusp days)
+                      (german-unit days "Tag" "Tagen" :einer "einem"))
+                     ((plusp hours)
+                      (german-unit hours "Stunde" "Stunden"))
+                     (t
+                      (german-unit minutes "Minute" "Minuten")))))
+    (format nil "nach ~A Stille" part)))
 
 (defun format-silence-divider (timestamp gap-seconds)
   "Format a silence divider with absolute time and duration."

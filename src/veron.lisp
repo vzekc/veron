@@ -874,17 +874,23 @@ STARTTLS negotiation on the plain port."
 
 (defun maybe-start-swank ()
   "Start a Swank server if SWANK_PORT is set in the environment.
+Binds on SWANK_HOST (default \"127.0.0.1\"; set to \"0.0.0.0\" to
+accept remote connections, which must then be gated by a
+~/.slime-secret token).
+
 Overrides quit-lisp so that ,q in SLIME closes the connection
 instead of killing the server process."
   (when-let (port-string (env "SWANK_PORT" nil))
-    (let ((port (parse-integer port-string)))
+    (let ((port (parse-integer port-string))
+          (host (env "SWANK_HOST" "127.0.0.1")))
       (handler-bind ((style-warning #'muffle-warning))
-        (swank:create-server :port port :dont-close t))
+        (swank:create-server :port port :dont-close t
+                             :interface host))
       (setf (fdefinition (find-symbol "QUIT-LISP" :swank/backend))
             (lambda ()
               (let ((restart (find-restart (find-symbol "CLOSE-CONNECTION" :swank))))
                 (when restart (invoke-restart restart)))))
-      (format t "~&;;; Swank server started on port ~D~%" port))))
+      (format t "~&;;; Swank server started on ~A:~D~%" host port))))
 
 (defun start-from-env ()
   "Start the VERON application with parameters read from environment variables.

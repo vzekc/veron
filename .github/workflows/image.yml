@@ -1,7 +1,13 @@
 name: image
 
 on:
-  push:
+  # Gate image builds on CI: this workflow only runs after the CI
+  # workflow on the same commit finishes successfully. workflow_dispatch
+  # is kept as a manual escape hatch (e.g. rebuild without re-running CI
+  # when only the Dockerfile changed).
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -15,12 +21,18 @@ env:
 
 jobs:
   build-push:
+    # workflow_run fires on any completion (success + failure). Build
+    # only when CI passed; workflow_dispatch bypasses the gate.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
+          # Build the exact commit CI tested, not whatever main points
+          # at right now (another push may have landed in between).
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
           submodules: recursive
           # Unshallow clone: the image retains .git so deploy/deploy.sh
           # can `git fetch origin main && git reset --hard` inside the

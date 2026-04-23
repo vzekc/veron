@@ -11,7 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       curl \
       libpq5 \
       libssl3 \
+      libmariadb3 \
     && rm -rf /var/lib/apt/lists/*
+# libmariadb3 satisfies the libmysqlclient load that a transitive Quicklisp
+# dep triggers at system-load time even though veron doesn't actually use
+# MySQL. Prod Debian has this by default; slim doesn't.
 
 # Layer 2: dedicated non-root user. UID matches the Deployment's
 # securityContext.runAsUser in the cluster manifests.

@@ -210,6 +210,11 @@
     (when conn
       (bt:with-lock-held ((mock-lock server))
         (setf (mock-connections server) (remove conn (mock-connections server))))
+      ;; Shutdown before close: on Linux, close() while another thread is
+      ;; blocked in read() may not send FIN until the read returns. Shutdown
+      ;; tears down the TCP connection immediately so the client sees EOF.
+      (ignore-errors
+       (sb-bsd-sockets:socket-shutdown (usocket:socket conn) :direction :io))
       (ignore-errors (usocket:socket-close conn)))))
 
 (defun wait-for-frame (server &key (timeout 3.0))

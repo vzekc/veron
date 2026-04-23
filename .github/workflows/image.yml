@@ -97,7 +97,7 @@ jobs:
 
       - name: Soft-deploy (hot-reload via Swank) with image fallback
         env:
-          NAMESPACE: dev
+          NAMESPACE: prod
           DEPLOYMENT: veron
         run: |
           set -euo pipefail

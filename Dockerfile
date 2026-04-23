@@ -16,10 +16,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libpq5 \
       libssl3 \
       libmariadb3 \
-      x3270 \
+      s3270 \
     && rm -rf /var/lib/apt/lists/*
-# x3270 provides s3270, used by deploy/confidence-test.sh after a
-# soft-deploy to verify the 3270 listener still serves the login screen.
+# s3270 is used by deploy/confidence-test.sh after a soft-deploy
+# to verify the 3270 listener still serves the login screen. It's
+# the scripting client, shipped in its own Debian package (not the
+# one x3270 installs).
 
 # woltlab-login depends on cl-mysql, which dlopens libmysqlclient_r /
 # libmysqlclient by name at system-load time. libmariadb3 is ABI-

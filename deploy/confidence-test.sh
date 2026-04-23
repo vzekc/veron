@@ -11,6 +11,10 @@ set -euo pipefail
 HOST=${VERON_HOST:-127.0.0.1}
 PORT=${VERON_PORT:-3270}
 TLS_PORT=${VERON_TLS_PORT:-}
+# VERON_HOST is a bind address (e.g. 0.0.0.0 in the container); the
+# confidence test *connects*, so map wildcard binds back to localhost.
+[ "$HOST" = "0.0.0.0" ] && HOST=127.0.0.1
+[ "$HOST" = "::" ] && HOST=127.0.0.1
 PASSED=0
 FAILED=0
 

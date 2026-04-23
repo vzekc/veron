@@ -11,9 +11,13 @@ set -euo pipefail
 VERON_DIR=/opt/veron
 
 # Source environment (SWANK_PORT, VERON_PORT, VERON_HOST, etc.)
-set -a
-source /etc/veron/env
-set +a
+# /etc/veron/env is only present on the VM deployment; in the k3s
+# container the same vars are supplied by the pod spec, so just skip.
+if [ -f /etc/veron/env ]; then
+  set -a
+  source /etc/veron/env
+  set +a
+fi
 
 echo "=== Pulling latest code ==="
 cd "$VERON_DIR"

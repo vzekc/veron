@@ -134,6 +134,13 @@
         (message (lispf:session-property lispf:*session* :new-entry-message)))
     (when (and author message)
       (add-guestbook-entry author message)
+      (let ((user (when (typep lispf:*session* 'authenticated-session)
+                    (session-user lispf:*session*))))
+        (publish-status :guestbook.created
+                        :actor (when user
+                                 (list :id (user-id user)
+                                       :username (user-username user)))
+                        :payload (list :author author :message message)))
       (notify :guestbook "Neuer Gaestebucheintrag"
               (format nil "Neuer Gaestebucheintrag von ~A" author)
               :originator-user-id (when (typep lispf:*session* 'authenticated-session)

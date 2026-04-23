@@ -6,6 +6,8 @@
   :pathname ""
   :components ((:module "src"
                 :components ((:file "package")
+                             (:file "nats-client")
+                             (:file "status-bus")
                              (:file "dotenv")
                              (:file "db")
                              (:file "user")
@@ -27,5 +29,7 @@
                              (:file "exhibitron-db")
                              (:file "cc-screen")
                              (:file "veron"))))
-  :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern #:dexador #:ironclad #:swank #:cl-smtp)
+  :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern #:dexador
+               #:ironclad #:swank #:cl-smtp
+               #:alexandria #:yason #:usocket #:babel #:cl+ssl)
   :in-order-to ((asdf:test-op (asdf:test-op #:veron-test))))

@@ -69,6 +69,11 @@
               (record-login user
                             :terminal-type (connection-term-type connection)
                             :tls (lispf:connection-tls-p connection)))
+        (publish-status :session.login
+                        :actor (list :id (user-id user) :username (user-username user))
+                        :payload (list :terminal_type (connection-term-type connection)
+                                       :tls (lispf:connection-tls-p connection)
+                                       :login_id (session-login-id session)))
         (lispf:log-message :info "login user=~A tls=~A"
                           (user-username user)
                           (if (lispf:connection-tls-p connection) "yes" "no"))
@@ -84,7 +89,11 @@
   (let ((login-id (session-login-id session))
         (user (session-user session)))
     (when login-id
-      (record-logout login-id))
+      (record-logout login-id)
+      (when user
+        (publish-status :session.logout
+                        :actor (list :id (user-id user) :username (user-username user))
+                        :payload (list :login_id login-id))))
     (when (and user (lispf:session-property session :chat-entered)
                (not (lispf:session-property session :chat-leaving)))
       (let ((channel-id (default-channel-id)))
@@ -93,7 +102,10 @@
             (leave-channel channel session))
           (add-chat-notification channel-id user
                                  "--- ~A hat den Chat verlassen"
-                                 (user-username user)))))
+                                 (user-username user))
+          (publish-status :chat.leave
+                          :actor (list :id (user-id user) :username (user-username user))
+                          :payload (list :channel_id channel-id)))))
     (when user
       (lispf:log-message :info "logout user=~A" (user-username user)))))
 
@@ -835,6 +847,7 @@ Otherwise, if the changelog has unread entries, go to changelog; otherwise main.
   (close-orphaned-chat-sessions)
   (lispf:log-message :info "starting notification delivery thread")
   (start-delivery-thread)
+  (start-status-bus)
   (log-deployment)
   (lispf:log-message :info "deployment complete"))
 

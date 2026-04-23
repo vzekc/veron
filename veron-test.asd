@@ -5,6 +5,8 @@
   :components ((:module "test"
                 :components ((:file "packages")
                              (:file "harness")
+                             (:file "nats-client-tests")
+                             (:file "status-bus-tests")
                              (:file "login-tests")
                              (:file "guestbook-tests")
                              (:file "chat-tests")

@@ -129,6 +129,12 @@ TYPE is :message or :notification. Returns the message plist."
       (vector-push-extend msg (channel-messages-buffer channel))
       (setf (channel-id-counter channel)
             (max (channel-id-counter channel) db-id)))
+    (when (eq type :message)
+      (publish-status :chat.message
+                      :actor (list :id (user-id user) :username (user-username user))
+                      :payload (list :channel_id channel-id
+                                     :message message
+                                     :db_id db-id)))
     msg))
 
 (defun add-chat-message (channel-id user format &rest args)

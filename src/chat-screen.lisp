@@ -75,7 +75,11 @@ Elides with '...' if names don't fit."
           (add-chat-notification
            (chat-channel-id)
            (session-user lispf:*session*)
-           "--- ~A hat den Chat betreten" name))))
+           "--- ~A hat den Chat betreten" name)
+          (let ((user (session-user lispf:*session*)))
+            (publish-status :chat.join
+                            :actor (list :id (user-id user) :username name)
+                            :payload (list :channel_id (chat-channel-id)))))))
     (update-chat-indicators))
   (let ((total (length (chat-all-formatted-lines))))
     (when (> total +chat-display-lines+)
@@ -165,7 +169,11 @@ runs right up to the boundary). Otherwise join with a single space."
     (when name
       (add-chat-notification channel-id
                              (session-user lispf:*session*)
-                             "--- ~A hat den Chat verlassen" name))))
+                             "--- ~A hat den Chat verlassen" name)
+      (let ((user (session-user lispf:*session*)))
+        (publish-status :chat.leave
+                        :actor (list :id (user-id user) :username name)
+                        :payload (list :channel_id channel-id))))))
 
 (defun clear-chat-input ()
   "Clear the chat input fields for no-clear redisplay."

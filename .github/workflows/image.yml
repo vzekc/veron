@@ -24,6 +24,11 @@ jobs:
           # can `git fetch origin main && git reset --hard` inside the
           # running pod. A shallow history breaks that.
           fetch-depth: 0
+          # Don't leave the ephemeral CI token in .git/config — it
+          # expires when the workflow ends, and the running pod would
+          # then fail on `git fetch` because the cached creds are stale.
+          # veron is a public repo; anonymous fetch is fine.
+          persist-credentials: false
 
       - uses: docker/setup-buildx-action@v3
 

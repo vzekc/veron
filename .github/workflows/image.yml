@@ -16,6 +16,8 @@ env:
 jobs:
   build-push:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,3 +57,56 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-push
+    # Only auto-deploy on main. workflow_dispatch runs won't trigger unless
+    # explicitly intended: if someone re-runs a dispatch on main, that's
+    # still a main-branch build and a deploy is fine.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      # Serialize deploys; the script is safe to re-run but racing two
+      # soft-deploys against the same pod just wastes time.
+      group: deploy-veron-prod
+      cancel-in-progress: false
+    steps:
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.32.2
+
+      - name: Write kubeconfig
+        env:
+          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_VERON_DEPLOY }}
+        run: |
+          printf '%s' "$KUBECONFIG_DATA" > "$RUNNER_TEMP/kubeconfig"
+          chmod 600 "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Soft-deploy (hot-reload via Swank) with image fallback
+        env:
+          NAMESPACE: dev
+          DEPLOYMENT: veron
+        run: |
+          set -euo pipefail
+
+          pod=$(kubectl -n "$NAMESPACE" get pod -l app="$DEPLOYMENT" \
+                        --field-selector=status.phase=Running \
+                        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+          if [[ -z "$pod" ]]; then
+            echo "::notice::no running veron pod — doing a cold rollout"
+            kubectl -n "$NAMESPACE" rollout restart "deployment/$DEPLOYMENT"
+            kubectl -n "$NAMESPACE" rollout status  "deployment/$DEPLOYMENT" --timeout=3m
+            exit 0
+          fi
+
+          echo "::notice::target pod $pod — attempting hot-reload"
+          if kubectl -n "$NAMESPACE" exec "$pod" -- \
+                bash -c 'cd /opt/veron && ./deploy/deploy.sh'; then
+            echo "::notice::hot-reload succeeded"
+          else
+            echo "::warning::hot-reload failed — rolling out a fresh pod from :main"
+            kubectl -n "$NAMESPACE" rollout restart "deployment/$DEPLOYMENT"
+            kubectl -n "$NAMESPACE" rollout status  "deployment/$DEPLOYMENT" --timeout=3m
+          fi

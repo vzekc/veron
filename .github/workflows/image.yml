@@ -20,6 +20,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # Unshallow clone: the image retains .git so deploy/deploy.sh
+          # can `git fetch origin main && git reset --hard` inside the
+          # running pod. A shallow history breaks that.
+          fetch-depth: 0
 
       - uses: docker/setup-buildx-action@v3
 

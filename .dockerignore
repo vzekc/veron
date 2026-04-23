@@ -1,0 +1,9 @@
+# .git IS intentionally kept — deploy/deploy.sh does git-fetch + reset
+# inside the running pod so hot-reload can advance past the baked-in
+# commit without rebuilding the image.
+
+.DS_Store
+node_modules/
+.venv/
+__pycache__/
+*.pyc

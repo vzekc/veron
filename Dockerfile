@@ -13,9 +13,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libssl3 \
       libmariadb3 \
     && rm -rf /var/lib/apt/lists/*
-# libmariadb3 satisfies the libmysqlclient load that a transitive Quicklisp
-# dep triggers at system-load time even though veron doesn't actually use
-# MySQL. Prod Debian has this by default; slim doesn't.
+
+# woltlab-login depends on cl-mysql, which dlopens libmysqlclient_r /
+# libmysqlclient by name at system-load time. libmariadb3 is ABI-
+# compatible but installs as libmariadb.so.3. Symlink the legacy names
+# so CFFI finds the library.
+RUN ln -sf libmariadb.so.3 /usr/lib/x86_64-linux-gnu/libmysqlclient.so \
+ && ln -sf libmariadb.so.3 /usr/lib/x86_64-linux-gnu/libmysqlclient_r.so \
+ && ldconfig
 
 # Layer 2: dedicated non-root user. UID matches the Deployment's
 # securityContext.runAsUser in the cluster manifests.

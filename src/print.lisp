@@ -326,7 +326,7 @@ read as a one or a zero.")
 Returns the octets, or NIL and a keyword saying why there are none:
 :unknown, :deleted, :converting, :missing or :unreachable."
   (multiple-value-bind (body status)
-      (http-get-octets (format nil "~A/foto/~A/datei/~A-~D.prn"
+      (http-get-octets (format nil "~A/foto/~A/~A-~D.prn"
                                (fotofix-base-url) photo-id
                                (printer-stem printer)
                                (print-resolution-dpi resolution)))

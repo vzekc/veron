@@ -293,7 +293,7 @@ RESPONDER receives the request path and returns a status and the body as octets.
            (printer (veron::find-printer "nec-p6"))
            (relay (connect-relay port "nec-p6 test-token")))
       (with-photo-website ((lambda (path)
-                             (if (string= path "/foto/K7NP4M/datei/nec-p6-180.prn")
+                             (if (string= path "/foto/K7NP4M/nec-p6-180.prn")
                                  (values 200 run)
                                  (values 404 (babel:string-to-octets "no")))))
         (unwind-protect

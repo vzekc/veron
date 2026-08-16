@@ -28,6 +28,8 @@
                              (:file "events-screen")
                              (:file "exhibitron-db")
                              (:file "cc-screen")
+                             (:file "print")
+                             (:file "print-screen")
                              (:file "veron"))))
   :depends-on (#:lispf #:lispf-edit #:woltlab-login #:postmodern #:dexador
                #:ironclad #:swank #:cl-smtp

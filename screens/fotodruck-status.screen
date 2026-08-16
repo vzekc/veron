@@ -1,0 +1,7 @@
+(:name "fotodruck-status"
+ :title "Fotodruck"
+ :screen "
+"
+ :fields ()
+ :dynamic-areas ((:name status :from (0 0) :to (17 79)))
+ :keys ((:pf3 "Zurueck" :back t)))

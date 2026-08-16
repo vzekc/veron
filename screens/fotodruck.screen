@@ -1,0 +1,25 @@
+(:name "fotodruck"
+ :title "Fotodruck"
+ :navigable t
+ :aliases ("foto")
+ :screen "
+
+   Ein Foto vom Fotoautomaten auf Papier ausgeben.
+"
+ :fields ((:from (3 3) :len 74 :name info1 :color turquoise)
+          (:from (4 3) :len 74 :name info2 :color turquoise)
+          (:from (5 3) :len 74 :name info3 :color turquoise)
+          (:from (7 3) :len 10 :name lbl-id)
+          (:from (7 14) :len 6 :name photo-id :write t :intense t :highlighting underscore)
+          (:from (9 3) :len 10 :name lbl-res)
+          (:from (9 14) :len 1 :name res-sel :write t :intense t :highlighting underscore)
+          (:from (9 17) :len 50 :name rs1 :color green)
+          (:from (10 17) :len 50 :name rs2 :color green)
+          (:from (11 17) :len 50 :name rs3 :color green)
+          (:from (13 3) :len 10 :name lbl-printer)
+          (:from (13 14) :len 1 :name printer-sel :write t :intense t :highlighting underscore)
+          (:from (13 17) :len 50 :name pr1 :color green)
+          (:from (14 17) :len 50 :name pr2 :color green)
+          (:from (15 17) :len 50 :name pr3 :color green))
+ :keys ((:enter "Drucken" :hidden t)
+        (:pf3 "Zurueck" :back t)))

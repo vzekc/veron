@@ -848,6 +848,7 @@ Otherwise, if the changelog has unread entries, go to changelog; otherwise main.
   (lispf:log-message :info "starting notification delivery thread")
   (start-delivery-thread)
   (start-status-bus)
+  (start-print-listener)
   (log-deployment)
   (lispf:log-message :info "deployment complete"))
 

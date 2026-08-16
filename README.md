@@ -13,6 +13,7 @@ text-mode screens over 3270 (optionally STARTTLS-upgraded).
 | Framework                 | [LISPF](lispf/) (submodule)                                   |
 | Auth backend              | [woltlab-login](woltlab-login/) — queries WoltLab's MySQL DB  |
 | Port                      | 3270 (configurable; STARTTLS default when TLS cert provided)  |
+| Live deployment           | systemd on retrostar, reachable at `veron.classic-computing.de:3270` |
 | Cluster deployment        | `dev` namespace in `vzekc-prod`, reachable at `veron.k8s.classic-computing.de:3270` |
 | Operator guide            | See [cluster-infra/README.md](https://github.com/vzekc/cluster-infra/blob/main/README.md) |
 | Container image           | `ghcr.io/vzekc/veron:main` (built on every push to `main`)    |
@@ -67,31 +68,45 @@ veron -> relay:  the bytes of the print run
 veron -> relay:  close, which is the end of the run
 ```
 
-So the relay is a shell loop, and lives with the show's other kit in the
+The relay lives with the show's other kit in the
 [fotofix](https://code.netzhansa.com/hanshuebner/fotofix) repository
-(`ansible/roles/print-relay/`):
+(`print-relay/`, installed by `ansible/roles/print-relay/`). It dials
+`veron.classic-computing.de:3272` on retrostar — 3271 there is the TLS 3270
+port. The protocol is small enough to speak from a shell, which is how to try
+it by hand:
 
 ```sh
-while :; do
-  { printf 'nec-p6 %s\n' "$TOKEN"; cat; } \
-    | nc veron.k8s.classic-computing.de 3271 \
-    | nc 192.168.2.222 3002
-  sleep 2
-done
+{ printf 'nec-p6 %s\n' "$TOKEN"; sleep 999999; } \
+  | nc veron.classic-computing.de 3272 \
+  | nc 192.168.2.222 3002
 ```
+
+The `sleep` holds the sending direction open; a relay whose socket half-closes
+is one veron reads as having gone away.
 
 Printers are a table in `src/print.lisp` — name, the file-name stem on the
 website, and the densities offered with their printing times. Adding a printer
 is another entry there; when more than one relay is connected the screen asks
 which printer to use.
 
-Exposing the port needs the Service port in
-[cluster](https://github.com/vzekc/cluster) and the load-balancer rule in
-[cluster-infra](https://github.com/vzekc/cluster-infra) alongside the 3270 port.
+Turning it on for a show is `VERON_PRINT_PORT=3272` and a `VERON_PRINT_TOKEN`
+in `/etc/veron/env`, and the same token in `/etc/fotofix-print-relay.env` on the
+exhibition Pi. The env file is read when the process starts, so this needs
+`systemctl restart veron` rather than a hot reload. With either variable unset
+nothing listens and the screen reports Fotodruck as unconfigured.
 
 ## Deploying
 
-veron is part of the vzekc k3s cluster. The flow:
+The install visitors reach is on **retrostar**
+(`veron.classic-computing.de`, 3270 and 3271 for TLS), run by systemd from
+`/opt/veron`. A push to `main` that passes CI triggers
+`.github/workflows/deploy.yml`, which ssh's in as `veron@retrostar` and runs
+`/opt/veron/deploy/deploy.sh` — the same fetch-and-hot-reload described below.
+Env lives in `/etc/veron/env` and is read at process start, so a change there
+needs `systemctl restart veron`.
+
+A second copy runs in the vzekc k3s cluster at
+`veron.k8s.classic-computing.de:3270`, deployed by its own flow:
 
 1. `git push` to `main`.
 2. GitHub Actions (`.github/workflows/image.yml`) builds + publishes

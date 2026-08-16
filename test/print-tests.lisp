@@ -161,6 +161,30 @@ RESPONDER receives the request path and returns a status and the body as octets.
                      "The connected printer should be the only ready one"))
         (usocket:socket-close socket)))))
 
+(define-test print-registration-keeps-the-relay ()
+  "Re-registering a printer, as a hot reload does, leaves its relay connected."
+  (with-print-listener (port)
+    (let ((printer (veron::find-printer "nec-p6"))
+          (socket (connect-relay port "nec-p6 test-token")))
+      (unwind-protect
+           (progn
+             (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
+                     "Printer should be ready")
+             (veron::register-printer "nec-p6" "NEC Pinwriter P6"
+                                      (list (veron::resolution 60 "Niedrig" 3)))
+             (assert (eq printer (veron::find-printer "nec-p6")) ()
+                     "Re-registering should keep the same printer")
+             (assert (veron::printer-ready-p (veron::find-printer "nec-p6")) ()
+                     "The relay should still be connected after re-registration")
+             (assert (= 1 (length (veron::printer-resolutions printer))) ()
+                     "Re-registering should update what the printer offers"))
+        (ignore-errors (usocket:socket-close socket))
+        ;; Put the table back the way the source defines it.
+        (veron::register-printer "nec-p6" "NEC Pinwriter P6"
+                                 (list (veron::resolution 360 "Hoch" 99)
+                                       (veron::resolution 180 "Mittel" 99)
+                                       (veron::resolution 60 "Niedrig" 99)))))))
+
 (define-test print-relay-rejects-wrong-token ()
   "A relay with the wrong token is dropped and no printer becomes available."
   (with-print-listener (port)

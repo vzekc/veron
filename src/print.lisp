@@ -22,10 +22,10 @@
   (:documentation "One density a printer offers, and how long a sheet takes at it."))
 
 (defclass printer ()
-  ((name :initarg :name :reader printer-name)
+  ((name :initarg :name :accessor printer-name)
    (stem :initarg :stem :reader printer-stem
          :documentation "File-name stem on the website, and the name the relay signs on with.")
-   (resolutions :initarg :resolutions :reader printer-resolutions)
+   (resolutions :initarg :resolutions :accessor printer-resolutions)
    (lock :initform (bt:make-lock "printer") :reader printer-lock)
    (relay :initform nil :accessor printer-relay
           :documentation "The socket the relay is connected on, or NIL.")
@@ -33,16 +33,33 @@
         :documentation "The most recent job, running or finished."))
   (:documentation "A printer at the show and the relay that feeds it."))
 
-(defparameter *printers*
-  (list (make-instance
-         'printer
-         :name "NEC Pinwriter P6"
-         :stem "nec-p6"
-         ;; TODO: measured at the show's printer
-         :resolutions (list (make-instance 'print-resolution :dpi 360 :label "Hoch" :minutes 99)
-                            (make-instance 'print-resolution :dpi 180 :label "Mittel" :minutes 99)
-                            (make-instance 'print-resolution :dpi 60 :label "Niedrig" :minutes 99))))
-  "The printers the show can offer. A new one is another entry here.")
+(defvar *printers* nil
+  "The printers the show can offer, as live objects: a hot reload updates what
+each one is called and what it offers while leaving the relay connected to it
+in place.")
+
+(defun find-printer (stem)
+  (find stem *printers* :key #'printer-stem :test #'string=))
+
+(defun register-printer (stem name resolutions)
+  "Define the printer known by STEM, or update the one already there."
+  (if-let (printer (find-printer stem))
+    (setf (printer-name printer) name
+          (printer-resolutions printer) resolutions)
+    (setf *printers* (append *printers*
+                             (list (make-instance 'printer :name name :stem stem
+                                                           :resolutions resolutions)))))
+  stem)
+
+(defun resolution (dpi label minutes)
+  (make-instance 'print-resolution :dpi dpi :label label :minutes minutes))
+
+;; The printers at the show. A new one is another call here.
+;; TODO: printing times measured at the show's printer
+(register-printer "nec-p6" "NEC Pinwriter P6"
+                  (list (resolution 360 "Hoch" 99)
+                        (resolution 180 "Mittel" 99)
+                        (resolution 60 "Niedrig" 99)))
 
 (defun print-listener-port ()
   "The port the relay dials, or NIL when Fotodruck is not configured."
@@ -60,9 +77,6 @@
 (defun fotodruck-configured-p ()
   "Return T when a listener port and a token are set."
   (and (print-listener-port) (plusp (length (print-token)))))
-
-(defun find-printer (stem)
-  (find stem *printers* :key #'printer-stem :test #'string=))
 
 (defun find-resolution (printer dpi)
   (find dpi (printer-resolutions printer) :key #'print-resolution-dpi))

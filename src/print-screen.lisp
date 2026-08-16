@@ -132,7 +132,7 @@
                    (print-resolution-dpi resolution))
            "")
      (case (print-job-state job)
-       (:running
+       ((:queued :running)
         (list (format nil "   Gesendet    ~D%" (round (* 100 (print-job-fraction job))))
               (format nil "   Fertig in   ca. ~D Minuten" (print-job-remaining-minutes job))
               ""

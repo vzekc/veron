@@ -73,18 +73,21 @@
   ((printer :initarg :printer :reader print-job-printer)
    (resolution :initarg :resolution :reader print-job-resolution)
    (username :initarg :username :reader print-job-username)
+   (data :initarg :data :accessor print-job-data
+         :documentation "The run itself, dropped once it has gone out.")
    (total :initarg :total :reader print-job-total)
    (sent :initform 0 :accessor print-job-sent)
    (started-at :initform (get-universal-time) :reader print-job-started-at)
-   (state :initform :running :accessor print-job-state)
+   (state :initform :queued :accessor print-job-state)
    (message :initform nil :accessor print-job-message))
   (:documentation "One print run on its way to a printer."))
 
-(defun job-running-p (job)
-  (and job (eq (print-job-state job) :running)))
+(defun job-active-p (job)
+  "Return T while JOB is waiting to go out or going out."
+  (and job (member (print-job-state job) '(:queued :running))))
 
 (defun printer-busy-p (printer)
-  (job-running-p (printer-job printer)))
+  (job-active-p (printer-job printer)))
 
 (defun printer-ready-p (printer)
   "Return T when PRINTER has a relay connected and is not printing."
@@ -145,7 +148,7 @@ LIMIT bytes, or the relay disconnects first."
 A relay that reconnects while an older socket is still registered replaces it,
 so a connection dropped without a close does not keep the printer occupied."
   (bt:with-lock-held ((printer-lock printer))
-    (unless (job-running-p (printer-job printer))
+    (unless (job-active-p (printer-job printer))
       (when-let (previous (printer-relay printer))
         (ignore-errors (usocket:socket-close previous)))
       (setf (printer-relay printer) socket))))
@@ -156,11 +159,20 @@ so a connection dropped without a close does not keep the printer occupied."
     (when (eq (printer-relay printer) socket)
       (setf (printer-relay printer) nil))))
 
-(defun wait-for-relay-close (socket)
-  "Block until the relay disconnects. It sends nothing after signing on."
-  (handler-case
-      (loop until (null (read-byte (usocket:socket-stream socket) nil nil)))
-    (error () nil)))
+(defun serve-relay (printer socket)
+  "Hold the connection until a run is ready for it, or the relay goes away.
+The relay says nothing after signing on, so anything readable is the connection
+closing. Sending happens here rather than in the thread that took the order, so
+one thread owns the socket for its whole life: the close that ends a run is then
+this thread's own, and reaches the relay as a close rather than as a socket
+shut from under a blocked reader."
+  (loop
+    (when (usocket:wait-for-input socket :timeout 0.2 :ready-only t)
+      (return))
+    (let ((job (printer-job printer)))
+      (when (and job (eq (print-job-state job) :queued))
+        (send-print-run job socket)
+        (return)))))
 
 (defun handle-relay-connection (socket)
   (let* ((line (read-relay-line socket 30 200))
@@ -180,7 +192,7 @@ so a connection dropped without a close does not keep the printer occupied."
       (return-from handle-relay-connection))
     (lispf:log-message :info "fotodruck: ~A verbunden" (printer-name printer))
     (unwind-protect
-         (wait-for-relay-close socket)
+         (serve-relay printer socket)
       (detach-relay printer socket)
       (lispf:log-message :info "fotodruck: ~A getrennt" (printer-name printer)))))
 
@@ -243,9 +255,10 @@ buffered somewhere.")
                      message
                      (format-duration (- (get-universal-time) (print-job-started-at job)))))
 
-(defun send-print-run (printer job data)
-  "Write DATA to PRINTER's relay and close, which ends the run."
-  (let ((socket (printer-relay printer)))
+(defun send-print-run (job socket)
+  "Write the run to SOCKET. The caller closes it, which ends the run."
+  (let ((data (print-job-data job)))
+    (setf (print-job-state job) :running)
     (handler-case
         (let ((stream (usocket:socket-stream socket))
               (total (length data)))
@@ -257,25 +270,23 @@ buffered somewhere.")
           (finish-print-job job :done nil))
       (error (e)
         (finish-print-job job :failed (princ-to-string e))))
-    (ignore-errors (usocket:socket-close socket))
-    (detach-relay printer socket)))
+    (setf (print-job-data job) nil)))
 
 (defun start-print-job (printer resolution username data)
-  "Claim PRINTER and send DATA to it in the background.
+  "Hand DATA to PRINTER for its relay to send.
 Returns the job, or NIL when the printer has meanwhile become unavailable."
   (when-let (job (bt:with-lock-held ((printer-lock printer))
                    (when (and (printer-relay printer)
-                              (not (job-running-p (printer-job printer))))
+                              (not (job-active-p (printer-job printer))))
                      (setf (printer-job printer)
                            (make-instance 'print-job :printer printer
                                                      :resolution resolution
                                                      :username username
+                                                     :data data
                                                      :total (length data))))))
     (lispf:log-message :info "fotodruck: ~A ~Ddpi ~D Bytes an ~A"
                        username (print-resolution-dpi resolution)
                        (length data) (printer-name printer))
-    (bt:make-thread (lambda () (send-print-run printer job data))
-                    :name (format nil "fotodruck-~A" (printer-stem printer)))
     job))
 
 ;;; The website

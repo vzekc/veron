@@ -50,15 +50,40 @@
     (force-output (usocket:socket-stream socket))
     socket))
 
-(defun read-until-eof (socket)
-  "Read everything the relay is sent, until the run ends with a close."
+(defun wait-for-close (socket &key (timeout 5.0))
+  "T when the far end closes the connection within TIMEOUT."
   (let ((stream (usocket:socket-stream socket))
+        (deadline (+ (get-internal-real-time)
+                     (* timeout internal-time-units-per-second))))
+    (loop
+      (when (> (get-internal-real-time) deadline)
+        (return nil))
+      ;; Only read once something is there, so a connection left open times
+      ;; out here rather than blocking in read-byte.
+      (when (or (listen stream)
+                (usocket:wait-for-input socket :timeout 1 :ready-only t))
+        (return (null (handler-case (read-byte stream nil nil)
+                        (error () nil))))))))
+
+(defun read-until-eof (socket &key (timeout 20.0))
+  "Read everything the relay is sent, until the run ends with a close.
+Gives up after TIMEOUT, so a connection that is never closed fails the test
+that reads it instead of hanging the suite."
+  (let ((stream (usocket:socket-stream socket))
+        (deadline (+ (get-internal-real-time)
+                     (* timeout internal-time-units-per-second)))
         (received (make-array 0 :element-type '(unsigned-byte 8)
                                 :adjustable t :fill-pointer t)))
     (handler-case
-        (loop for byte = (read-byte stream nil nil)
-              while byte
-              do (vector-push-extend byte received))
+        (loop
+          (when (> (get-internal-real-time) deadline)
+            (return))
+          (when (or (listen stream)
+                    (usocket:wait-for-input socket :timeout 1 :ready-only t))
+            (let ((byte (read-byte stream nil nil)))
+              (unless byte
+                (return))
+              (vector-push-extend byte received))))
       (error () nil))
     received))
 
@@ -143,9 +168,7 @@ RESPONDER receives the request path and returns a status and the body as octets.
           (socket (connect-relay port "nec-p6 falsch")))
       (unwind-protect
            (progn
-             (assert (wait-until (lambda () (null (read-byte (usocket:socket-stream socket) nil nil)))
-                                 :timeout 5.0)
-                     () "Connection should have been closed")
+             (assert (wait-for-close socket) () "Connection should have been closed")
              (assert (null (veron::printer-relay printer)) ()
                      "No relay should be registered after a wrong token"))
         (ignore-errors (usocket:socket-close socket))))))
@@ -155,10 +178,7 @@ RESPONDER receives the request path and returns a status and the body as octets.
   (with-print-listener (port)
     (let ((socket (connect-relay port "kein-drucker test-token")))
       (unwind-protect
-           (assert (wait-until (lambda ()
-                                 (null (read-byte (usocket:socket-stream socket) nil nil)))
-                               :timeout 5.0)
-                   () "Connection should have been closed")
+           (assert (wait-for-close socket) () "Connection should have been closed")
         (ignore-errors (usocket:socket-close socket))))))
 
 ;;; A run on its way out
@@ -202,11 +222,13 @@ RESPONDER receives the request path and returns a status and the body as octets.
            (progn
              (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
                      "Printer should be ready")
-             ;; Claim the printer without sending, so the job stays running.
+             ;; Claim the printer without sending, so the job stays active.
              (let ((job (make-instance 'veron::print-job
                                        :printer printer :resolution resolution
-                                       :username "testuser" :total (length data))))
-               (setf (veron::printer-job printer) job)
+                                       :username "testuser" :data data
+                                       :total (length data))))
+               (setf (veron::print-job-state job) :running
+                     (veron::printer-job printer) job)
                (assert (not (veron::printer-ready-p printer)) ()
                        "A printer with a running job is not ready")
                (assert (null (veron::start-print-job printer resolution "otheruser" data)) ()

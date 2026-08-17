@@ -59,6 +59,13 @@ with none connected it says so and does not ask for an id. One sheet at a time:
 a second user meanwhile is told the printer is busy and roughly how long is
 left.
 
+The bytes go out on the schedule the chosen density prints at, so what is left
+in the buffers between veron and the paper stays small: the run ends when the
+sheet does, and how much has gone out is a fair measure of how far the sheet is.
+A printer slower than that schedule holds the writes back and the figures follow
+it. The relay's connection ends with the run and is dialled again, so a printer
+that has just printed reads as busy until it is back.
+
 The relay signs on with one line — the printer's name and the token — and
 everything after it travels the other way:
 

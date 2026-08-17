@@ -22,11 +22,20 @@
     (unwind-protect (usocket:get-local-port socket)
       (usocket:socket-close socket))))
 
+(defun register-test-printer ()
+  "The show's printer with printing times of a few seconds, so that a run paced
+against the sheet finishes while a test is watching."
+  (veron::register-printer "nec-p6" "NEC Pinwriter P6"
+                           (list (veron::resolution 60 "Niedrig" 1)
+                                 (veron::resolution 180 "Mittel" 2)
+                                 (veron::resolution 360 "Hoch" 3))))
+
 (defmacro with-print-listener ((port-var &key (token "test-token")) &body body)
   "Run BODY with the Fotodruck listener up on a free port, then shut it down."
   `(let ((,port-var (free-port)))
      (setf (uiop:getenv "VERON_PRINT_PORT") (princ-to-string ,port-var)
            (uiop:getenv "VERON_PRINT_TOKEN") ,token)
+     (register-test-printer)
      (unwind-protect
           (progn
             (veron::start-print-listener :host "127.0.0.1")
@@ -38,6 +47,7 @@
              (ignore-errors (usocket:socket-close relay))))
          (setf (veron::printer-relay printer) nil
                (veron::printer-job printer) nil))
+       (veron::register-show-printers)
        (setf (uiop:getenv "VERON_PRINT_PORT") ""
              (uiop:getenv "VERON_PRINT_TOKEN") ""))))
 
@@ -193,12 +203,7 @@ close does not leave the printer looking connected for the life of the process."
                      "The relay should still be connected after re-registration")
              (assert (= 1 (length (veron::printer-resolutions printer))) ()
                      "Re-registering should update what the printer offers"))
-        (ignore-errors (usocket:socket-close socket))
-        ;; Put the table back the way the source defines it.
-        (veron::register-printer "nec-p6" "NEC Pinwriter P6"
-                                 (list (veron::resolution 360 "Hoch" 99)
-                                       (veron::resolution 180 "Mittel" 99)
-                                       (veron::resolution 60 "Niedrig" 99)))))))
+        (ignore-errors (usocket:socket-close socket))))))
 
 (define-test print-relay-rejects-wrong-token ()
   "A relay with the wrong token is dropped and no printer becomes available."
@@ -250,6 +255,57 @@ close does not leave the printer looking connected for the life of the process."
                        "The relay should be detached once the run has gone out")))
         (ignore-errors (usocket:socket-close socket))))))
 
+(define-test print-run-takes-the-sheets-time ()
+  "The run goes out at the pace of the sheet, so a small one is not over at once."
+  (with-print-listener (port)
+    (let* ((printer (veron::find-printer "nec-p6"))
+           (resolution (veron::find-resolution printer 180))
+           (data (make-array 20000 :element-type '(unsigned-byte 8) :initial-element 65))
+           (socket (connect-relay port "nec-p6 test-token")))
+      (unwind-protect
+           (progn
+             (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
+                     "Printer should be ready")
+             (let ((started (get-internal-real-time))
+                   (job (veron::start-print-job printer resolution "testuser" data)))
+               (assert job () "The job should have been accepted")
+               (assert (wait-until (lambda () (plusp (veron::print-job-sent job)))) ()
+                       "The run should have started")
+               (assert (< (veron::print-job-sent job) (length data)) ()
+                       "The whole run should not have gone out in one go")
+               (assert (= (length data) (length (read-until-eof socket))) ()
+                       "Every byte should reach the relay")
+               (assert (wait-until (lambda () (eq :done (veron::print-job-state job)))) ()
+                       "The job should have finished, state is ~S"
+                       (veron::print-job-state job))
+               (assert (>= (/ (- (get-internal-real-time) started)
+                              internal-time-units-per-second)
+                           1)
+                       () "The run should have taken about as long as the sheet")))
+        (ignore-errors (usocket:socket-close socket))))))
+
+(define-test print-printer-busy-until-the-relay-returns ()
+  "A printer whose run has just ended is busy, not gone, until its relay is back."
+  (let* ((printer (veron::find-printer "nec-p6"))
+         (resolution (veron::find-resolution printer 180))
+         (job (make-instance 'veron::print-job
+                             :printer printer :resolution resolution
+                             :username "testuser" :data nil :total 1000)))
+    (unwind-protect
+         (progn
+           (setf (veron::printer-relay printer) nil
+                 (veron::printer-job printer) job
+                 (veron::print-job-state job) :running)
+           (assert (veron::printer-busy-p printer) () "A running job makes a printer busy")
+           (veron::finish-print-job job :done nil)
+           (assert (veron::printer-busy-p printer) ()
+                   "A printer whose relay has yet to dial back in is still busy")
+           (setf (veron::print-job-finished-at job)
+                 (- (get-universal-time) veron::*relay-return-seconds* 1))
+           (assert (not (veron::printer-busy-p printer)) ()
+                   "A printer whose relay never came back counts as gone"))
+      (setf (veron::printer-job printer) nil))))
+
 (define-test print-job-refused-while-busy ()
   "One sheet at a time: a second job is refused while the first is running."
   (with-print-listener (port)
@@ -273,6 +329,31 @@ close does not leave the printer looking connected for the life of the process."
                (assert (null (veron::start-print-job printer resolution "otheruser" data)) ()
                        "A second job should be refused while one is running")))
         (ignore-errors (usocket:socket-close socket))))))
+
+;;; What the show offers
+
+(define-test print-duration-text ()
+  "A printing time reads the way the screens say it."
+  (assert (string= "1 Minute" (veron::print-duration-text 60)) () "One whole minute")
+  (assert (string= "5 Minuten" (veron::print-duration-text 300)) () "Whole minutes")
+  (assert (string= "3:30 Minuten" (veron::print-duration-text 210)) () "Part minutes")
+  (assert (string= "45 Sekunden" (veron::print-duration-text 45)) () "Under a minute"))
+
+(define-test print-densities-in-order ()
+  "The show's densities run from coarse to fine, with the times measured on it."
+  (veron::register-show-printers)
+  (let ((resolutions (veron::printer-resolutions (veron::find-printer "nec-p6"))))
+    (assert (equal '("Niedrig" "Mittel" "Hoch")
+                   (mapcar #'veron::print-resolution-label resolutions))
+            () "Densities should be offered coarsest first")
+    (assert (equal '(60 180 360) (mapcar #'veron::print-resolution-dpi resolutions))
+            () "Labels should go with the densities they name")
+    (assert (equal '("1 Minute" "3:30 Minuten" "5 Minuten")
+                   (mapcar (lambda (r)
+                             (veron::print-duration-text
+                              (veron::print-resolution-seconds r)))
+                           resolutions))
+            () "Printing times should be the ones the show measured")))
 
 ;;; Photo ids
 
@@ -419,6 +500,61 @@ close does not leave the printer looking connected for the life of the process."
                          () "Should say the photo is still being converted")))
           (ignore-errors (usocket:socket-close relay)))))))
 
+(define-test e2e-fotodruck-id-in-capitals ()
+  "Enter with an id and no density takes the id up in capitals and moves the
+cursor to the density."
+  (with-print-listener (port)
+    (let ((printer (veron::find-printer "nec-p6"))
+          (relay (connect-relay port "nec-p6 test-token")))
+      (unwind-protect
+           (progn
+             (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
+                     "Printer should be ready")
+             (with-veron-app (s :username "printuser7" :password "printpass7")
+               (login s "printuser7" "printpass7")
+               (select-menu-item s "Fotodruck")
+               (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
+                       () "Should ask for the photo id")
+               (move-cursor s 8 14)
+               (type-text s "k7np4m")
+               (press-enter s)
+               (assert-message s "Aufloesung waehlen")
+               (assert-text-at s 8 14 6 "K7NP4M"
+                               :description "The id should be taken up in capitals")
+               (assert-cursor-at s 10 14
+                                 :description "Cursor should be on the density field")))
+        (ignore-errors (usocket:socket-close relay))))))
+
+(define-test e2e-fotodruck-busy ()
+  "A printer with a sheet to finish says it is busy rather than reporting itself gone."
+  (with-print-listener (port)
+    (let* ((printer (veron::find-printer "nec-p6"))
+           (resolution (veron::find-resolution printer 180))
+           (relay (connect-relay port "nec-p6 test-token")))
+      (unwind-protect
+           (progn
+             (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
+                     "Printer should be ready")
+             ;; Claim the printer without sending, so the sheet stays on its way.
+             (let ((job (make-instance 'veron::print-job
+                                       :printer printer :resolution resolution
+                                       :username "otheruser" :data nil :total 1000)))
+               (setf (veron::print-job-state job) :running
+                     (veron::print-job-sent job) 500
+                     (veron::printer-job printer) job))
+             (with-veron-app (s :username "printuser8" :password "printpass8")
+               (login s "printuser8" "printpass8")
+               (select-menu-item s "Fotodruck")
+               (assert-on-screen s "FOTODRUCK")
+               (assert (wait-for-screen-contains s "belegt" :timeout 3)
+                       () "Should say the printer is busy")
+               (assert (wait-for-screen-contains s "Der laufende Auftrag" :timeout 3)
+                       () "Should say how much longer the running job needs")
+               (assert (not (search "kein Drucker verbunden"
+                                    (format nil "~{~A~^~%~}" (screen-text s))))
+                       () "A busy printer is not a printer that is gone")))
+        (ignore-errors (usocket:socket-close relay))))))
+
 (define-test e2e-fotodruck-offers-the-form ()
   "With a relay connected the form asks for an id and offers the densities."
   (with-print-listener (port)
@@ -438,5 +574,11 @@ close does not leave the printer looking connected for the life of the process."
                  (assert (search "Hoch" full) () "Should offer the high density")
                  (assert (search "360 dpi" full) () "Should name the density")
                  (assert (search "NEC Pinwriter P6" full) ()
-                         "Should name the connected printer"))))
+                         "Should name the connected printer"))
+               (assert (search "Niedrig" (screen-text-at s 10 17 50)) ()
+                       "The coarsest density should be the first choice")
+               (assert (search "Mittel" (screen-text-at s 11 17 50)) ()
+                       "The middle density should be the second choice")
+               (assert (search "Hoch" (screen-text-at s 12 17 50)) ()
+                       "The finest density should be the last choice")))
         (ignore-errors (usocket:socket-close socket))))))

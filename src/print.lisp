@@ -18,7 +18,7 @@
 (defclass print-resolution ()
   ((dpi :initarg :dpi :reader print-resolution-dpi)
    (label :initarg :label :reader print-resolution-label)
-   (minutes :initarg :minutes :reader print-resolution-minutes))
+   (seconds :initarg :seconds :reader print-resolution-seconds))
   (:documentation "One density a printer offers, and how long a sheet takes at it."))
 
 (defclass printer ()
@@ -51,15 +51,17 @@ in place.")
                                                            :resolutions resolutions)))))
   stem)
 
-(defun resolution (dpi label minutes)
-  (make-instance 'print-resolution :dpi dpi :label label :minutes minutes))
+(defun resolution (dpi label seconds)
+  (make-instance 'print-resolution :dpi dpi :label label :seconds seconds))
 
-;; The printers at the show. A new one is another call here.
-;; TODO: printing times measured at the show's printer
-(register-printer "nec-p6" "NEC Pinwriter P6"
-                  (list (resolution 360 "Hoch" 99)
-                        (resolution 180 "Mittel" 99)
-                        (resolution 60 "Niedrig" 99)))
+(defun register-show-printers ()
+  "The printers at the show, coarsest density first. A new one is another call here."
+  (register-printer "nec-p6" "NEC Pinwriter P6"
+                    (list (resolution 60 "Niedrig" 60)
+                          (resolution 180 "Mittel" 210)
+                          (resolution 360 "Hoch" 300))))
+
+(register-show-printers)
 
 (defun print-listener-port ()
   "The port the relay dials, or NIL when Fotodruck is not configured."
@@ -92,6 +94,7 @@ in place.")
    (total :initarg :total :reader print-job-total)
    (sent :initform 0 :accessor print-job-sent)
    (started-at :initform (get-universal-time) :reader print-job-started-at)
+   (finished-at :initform nil :accessor print-job-finished-at)
    (state :initform :queued :accessor print-job-state)
    (message :initform nil :accessor print-job-message))
   (:documentation "One print run on its way to a printer."))
@@ -100,8 +103,22 @@ in place.")
   "Return T while JOB is waiting to go out or going out."
   (and job (member (print-job-state job) '(:queued :running))))
 
+(defparameter *relay-return-seconds* 30
+  "How long a printer whose run has just ended is given for its relay to dial
+back in before it counts as gone.")
+
 (defun printer-busy-p (printer)
-  (job-active-p (printer-job printer)))
+  "Return T while PRINTER has a sheet to finish.
+The relay's connection ends with the run and is dialled again, so a printer
+whose relay has just gone is one that has just printed rather than one that has
+gone away."
+  (when-let (job (printer-job printer))
+    (or (job-active-p job)
+        (and (null (printer-relay printer))
+             (print-job-finished-at job)
+             (< (- (get-universal-time) (print-job-finished-at job))
+                *relay-return-seconds*)
+             t))))
 
 (defun printer-ready-p (printer)
   "Return T when PRINTER has a relay connected and is not printing."
@@ -110,9 +127,6 @@ in place.")
 (defun ready-printers ()
   (remove-if-not #'printer-ready-p *printers*))
 
-(defun connected-printers ()
-  (remove-if-not #'printer-relay *printers*))
-
 (defun print-job-fraction (job)
   "How much of the run has gone out, from 0 to 1."
   (let ((total (print-job-total job)))
@@ -120,9 +134,19 @@ in place.")
         (/ (print-job-sent job) total)
         1)))
 
-(defun print-job-remaining-minutes (job)
-  (round (* (print-resolution-minutes (print-job-resolution job))
-            (- 1 (print-job-fraction job)))))
+(defun print-job-seconds (job)
+  "How long the sheet takes at the density it was ordered in."
+  (print-resolution-seconds (print-job-resolution job)))
+
+(defun print-job-remaining-seconds (job)
+  "How much longer the sheet takes.
+A printer that holds the run back stretches what is left along with it, so the
+figure follows the sheet rather than the schedule it was started on."
+  (let* ((fraction (print-job-fraction job))
+         (elapsed (- (get-universal-time) (print-job-started-at job)))
+         (expected (print-job-seconds job))
+         (projected (if (plusp fraction) (/ elapsed fraction) expected)))
+    (max 0 (round (* (- 1 fraction) (max expected projected))))))
 
 ;;; The relay connection
 ;;;
@@ -211,6 +235,17 @@ minute and a half."
     (ignore-errors
      (setf (sb-bsd-sockets:sockopt-tcp-keepcnt raw) *keepalive-probes*))))
 
+(defparameter *print-send-buffer-bytes* 8192
+  "How much of a run the kernel may hold for the relay. A short queue is what
+makes a printer slower than its schedule hold the writes back, instead of the
+run disappearing into a buffer and looking finished.")
+
+(defun limit-send-buffer (socket)
+  "Keep the kernel's queue for SOCKET short, so the printer's pace reaches here."
+  (ignore-errors
+   (setf (sb-bsd-sockets:sockopt-send-buffer (usocket:socket socket))
+         *print-send-buffer-bytes*)))
+
 (defun handle-relay-connection (socket)
   (let* ((line (read-relay-line socket 30 200))
          (space (and line (position #\Space line)))
@@ -226,6 +261,7 @@ minute and a half."
     ;; Set up the socket before it is registered, so that it is a fully
     ;; configured connection by the time anything can find it.
     (keep-alive socket)
+    (limit-send-buffer socket)
     (unless (attach-relay printer socket)
       (lispf:log-message :warn "fotodruck: ~A druckt gerade, Verbindung abgewiesen"
                          (printer-name printer))
@@ -279,14 +315,17 @@ connects the moment this returns finds the port open."
 
 ;;; Sending a run
 
-(defparameter *print-chunk-size* 4096
-  "Written and flushed a chunk at a time, so the printer's own pace shows up
-as progress rather than as one long write that returns when the last byte is
-buffered somewhere.")
+(defparameter *print-chunk-size* 1024
+  "Written and flushed a chunk at a time, so what has gone out is what the
+printer is working on rather than what a buffer swallowed.")
+
+(defparameter *print-tick-seconds* 0.5
+  "How often a run that is ahead of the sheet looks at the clock again.")
 
 (defun finish-print-job (job state message)
   (setf (print-job-state job) state
-        (print-job-message job) message)
+        (print-job-message job) message
+        (print-job-finished-at job) (get-universal-time))
   (lispf:log-message (if (eq state :done) :info :warn)
                      "fotodruck: ~A ~Ddpi ~A~@[ (~A)~] nach ~A"
                      (print-job-username job)
@@ -295,18 +334,39 @@ buffered somewhere.")
                      message
                      (format-duration (- (get-universal-time) (print-job-started-at job)))))
 
+(defun paced-limit (job total elapsed)
+  "How many of TOTAL bytes may have gone out after ELAPSED seconds."
+  (let ((seconds (print-job-seconds job)))
+    (if (plusp seconds)
+        (min total (floor (* total elapsed) seconds))
+        total)))
+
 (defun send-print-run (job socket)
-  "Write the run to SOCKET. The caller closes it, which ends the run."
-  (let ((data (print-job-data job)))
+  "Write the run to SOCKET at the sheet's own pace. The caller closes it, which
+ends the run.
+The printer takes minutes over a sheet that the network carries in a moment, so
+the bytes go out on the schedule the density is printed at. What is left in the
+buffers between here and the paper then stays small, which makes the run end
+when the sheet does and the bytes gone out a fair measure of the sheet's
+progress. A printer slower than the schedule holds the writes back, and the
+figures follow it."
+  (let* ((data (print-job-data job))
+         (total (length data))
+         (started (get-internal-real-time)))
     (setf (print-job-state job) :running)
     (handler-case
-        (let ((stream (usocket:socket-stream socket))
-              (total (length data)))
-          (loop for start from 0 by *print-chunk-size* below total
-                for end = (min total (+ start *print-chunk-size*))
-                do (write-sequence data stream :start start :end end)
-                   (force-output stream)
-                   (setf (print-job-sent job) end))
+        (let ((stream (usocket:socket-stream socket)))
+          (loop for sent = (print-job-sent job)
+                while (< sent total)
+                for elapsed = (/ (- (get-internal-real-time) started)
+                                 internal-time-units-per-second)
+                for limit = (paced-limit job total elapsed)
+                do (if (and (< limit total) (< (- limit sent) *print-chunk-size*))
+                       (sleep *print-tick-seconds*)
+                       (progn
+                         (write-sequence data stream :start sent :end limit)
+                         (force-output stream)
+                         (setf (print-job-sent job) limit))))
           (finish-print-job job :done nil))
       (error (e)
         (finish-print-job job :failed (princ-to-string e))))

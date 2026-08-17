@@ -5,6 +5,15 @@
 
 (in-package #:veron)
 
+(defun print-duration-text (seconds)
+  "SECONDS in the words these screens use: whole minutes by name, the rest as m:ss."
+  (multiple-value-bind (minutes rest) (floor (round seconds) 60)
+    (cond ((and (zerop minutes) (= rest 1)) "1 Sekunde")
+          ((zerop minutes) (format nil "~D Sekunden" rest))
+          ((and (= minutes 1) (zerop rest)) "1 Minute")
+          ((zerop rest) (format nil "~D Minuten" minutes))
+          (t (format nil "~D:~2,'0D Minuten" minutes rest)))))
+
 (defun printer-choice-line (items index)
   "The INDEX-th (1-based) printer as a choice line, or an empty line."
   (if-let (printer (nth (1- index) items))
@@ -14,11 +23,11 @@
 (defun resolution-choice-line (items index)
   "The INDEX-th (1-based) resolution as a choice line, or an empty line."
   (if-let (resolution (nth (1- index) items))
-    (format nil "~D  ~8A (~3D dpi)  ca. ~D Minuten"
+    (format nil "~D  ~8A (~3D dpi)  ca. ~A"
             index
             (print-resolution-label resolution)
             (print-resolution-dpi resolution)
-            (print-resolution-minutes resolution))
+            (print-duration-text (print-resolution-seconds resolution)))
     ""))
 
 (defun selection-index (value)
@@ -36,12 +45,13 @@
         (t (when-let (index (selection-index value))
              (nth (1- index) items)))))
 
-(defun busy-printer-note ()
-  "What to say while a sheet is on its way to the only printer there is."
-  (if-let (printer (find-if #'printer-busy-p (connected-printers)))
-    (format nil "Der laufende Auftrag ist in ca. ~D Minuten fertig."
-            (print-job-remaining-minutes (printer-job printer)))
-    ""))
+(defun busy-printer-note (printer)
+  "What to say while PRINTER still has a sheet to finish."
+  (let ((job (printer-job printer)))
+    (if (job-active-p job)
+        (format nil "Der laufende Auftrag ist in ca. ~A fertig."
+                (print-duration-text (print-job-remaining-seconds job)))
+        "Der Drucker meldet sich gleich wieder.")))
 
 ;;; The form
 
@@ -52,7 +62,8 @@
   (setf info1 "" info2 "" info3 ""
         lbl-printer "" pr1 "" pr2 "" pr3 ""
         lbl-id "" lbl-res "" rs1 "" rs2 "" rs3 "")
-  (let ((ready (ready-printers)))
+  (let ((ready (ready-printers))
+        (busy (find-if #'printer-busy-p *printers*)))
     (if ready
         (lispf:show-key :enter "Drucken")
         ;; Nothing to fill in when there is nothing to print on.
@@ -65,13 +76,13 @@
     (cond
       ((not (fotodruck-configured-p))
        (setf info1 "Der Fotodruck ist auf diesem System nicht konfiguriert."))
-      ((null (connected-printers))
+      ((and (null ready) busy)
+       (setf info1 "Der Drucker ist zurzeit belegt."
+             info2 (busy-printer-note busy)
+             info3 "Bitte spaeter noch einmal versuchen."))
+      ((null ready)
        (setf info1 "Zurzeit ist kein Drucker verbunden."
              info2 "Bitte spaeter noch einmal versuchen."))
-      ((null ready)
-       (setf info1 "Der Drucker ist zurzeit belegt."
-             info2 (busy-printer-note)
-             info3 "Bitte spaeter noch einmal versuchen."))
       (t
        (setf info1 "Foto-ID vom Beleg des Fotoautomaten eingeben und Aufloesung waehlen."
              lbl-id "Foto-ID"
@@ -102,13 +113,17 @@
     (unless printer
       (lispf:application-error
        (if ready "Bitte Drucker waehlen" "Zurzeit ist kein Drucker verfuegbar")))
-    (let ((id (string-upcase (string-trim " " photo-id)))
-          (resolution (selected-item (printer-resolutions printer) res-sel)))
-      (unless (valid-photo-id-p id)
+    ;; The id is written back in the shape it is read in, so a correction is
+    ;; made to what the printer will be asked for.
+    (setf photo-id (string-upcase (string-trim " " photo-id)))
+    (let ((resolution (selected-item (printer-resolutions printer) res-sel)))
+      (unless (valid-photo-id-p photo-id)
+        (lispf:set-cursor-to-field "photo-id")
         (lispf:application-error "Bitte die sechsstellige Foto-ID vom Beleg eingeben"))
       (unless resolution
+        (lispf:set-cursor-to-field "res-sel")
         (lispf:application-error "Bitte Aufloesung waehlen"))
-      (multiple-value-bind (data reason) (fetch-print-run printer resolution id)
+      (multiple-value-bind (data reason) (fetch-print-run printer resolution photo-id)
         (unless data
           (lispf:application-error (print-run-error-message reason)))
         (let ((job (start-print-job printer resolution
@@ -133,8 +148,9 @@
            "")
      (case (print-job-state job)
        ((:queued :running)
-        (list (format nil "   Gesendet    ~D%" (round (* 100 (print-job-fraction job))))
-              (format nil "   Fertig in   ca. ~D Minuten" (print-job-remaining-minutes job))
+        (list (format nil "   Gedruckt    ~D%" (round (* 100 (print-job-fraction job))))
+              (format nil "   Fertig in   ca. ~A"
+                      (print-duration-text (print-job-remaining-seconds job)))
               ""
               "   Der Ausdruck laeuft auch weiter, wenn Sie diese Anzeige verlassen."))
        (:done

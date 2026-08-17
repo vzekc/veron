@@ -331,3 +331,56 @@
                        :timeout 3.0)))
       (assert second-sub)
       (assert (search "SUB veron.>" (second second-sub))))))
+
+;;; Descriptors
+
+(defun probe-descriptor-number ()
+  "The descriptor a fresh socket is given, which climbs when sockets leak."
+  (let ((socket (usocket:socket-listen "127.0.0.1" 0 :reuse-address t)))
+    (unwind-protect
+         (sb-bsd-sockets:socket-file-descriptor (usocket:socket socket))
+      (usocket:socket-close socket))))
+
+(defun start-plain-server ()
+  "A listener that answers in plain text, to drive a TLS handshake into failure.
+Returns the port and a shutdown function. Each connection is closed as soon as
+it is answered, so the server holds no descriptors of its own."
+  (let* ((listener (usocket:socket-listen "127.0.0.1" 0
+                                          :element-type '(unsigned-byte 8)
+                                          :reuse-address t))
+         (port (usocket:get-local-port listener))
+         (thread (bt:make-thread
+                  (lambda ()
+                    (handler-case
+                        (loop
+                          (let ((socket (usocket:socket-accept listener)))
+                            (unwind-protect
+                                 (ignore-errors
+                                  (let ((stream (usocket:socket-stream socket)))
+                                    (write-sequence
+                                     (babel:string-to-octets
+                                      (format nil "INFO {}~C~C" #\Return #\Linefeed))
+                                     stream)
+                                    (finish-output stream)))
+                              (ignore-errors (usocket:socket-close socket)))))
+                      (error () nil)))
+                  :name "plain-nats-server")))
+    (values port
+            (lambda ()
+              (ignore-errors (usocket:socket-close listener))
+              (ignore-errors (bt:destroy-thread thread))))))
+
+(define-test nats-failed-tls-handshake-closes-the-socket ()
+  "A server that cannot be negotiated with costs an attempt, not a descriptor."
+  (multiple-value-bind (port stop) (start-plain-server)
+    (unwind-protect
+         (let ((before (probe-descriptor-number)))
+           (dotimes (i 20)
+             (handler-case
+                 (veron.nats::open-socket "127.0.0.1" port :tls-p t)
+               (error () nil)))
+           (let ((after (probe-descriptor-number)))
+             (assert (< (- after before) 10) ()
+                     "Descriptor numbers climbed from ~D to ~D over 20 failed handshakes"
+                     before after)))
+      (funcall stop))))

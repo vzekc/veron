@@ -14,7 +14,10 @@ ExecStart=/usr/bin/sbcl --non-interactive \
     --load /home/veron/quicklisp/setup.lisp \
     --load load.lisp \
     --eval '(veron:start-from-env)'
-Restart=on-failure
+# Swank installs its own debugger hook, so an unhandled error in the main
+# thread reaches the debugger and leaves SBCL exiting 0. The server should be
+# running whatever its exit status was, so restart on a clean exit too.
+Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal

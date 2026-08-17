@@ -203,15 +203,19 @@ Signals END-OF-FILE if the stream closes before CRLF is seen."
 ;;; Connection lifecycle
 
 (defun open-socket (host port &key tls-p)
-  "Open a TCP (or TLS) connection. Returns (values socket stream)."
-  (let* ((socket (usocket:socket-connect host port
-                                         :element-type '(unsigned-byte 8)))
-         (raw (usocket:socket-stream socket))
-         (stream (if tls-p
-                     (cl+ssl:make-ssl-client-stream
-                      raw :hostname host :verify :required)
-                     raw)))
-    (values socket stream)))
+  "Open a TCP (or TLS) connection. Returns (values socket stream).
+The socket is closed if the TLS handshake fails, so that a server which cannot
+be negotiated with costs one attempt rather than one file descriptor a retry."
+  (let ((socket (usocket:socket-connect host port
+                                        :element-type '(unsigned-byte 8))))
+    (handler-bind ((error (lambda (condition)
+                            (declare (ignore condition))
+                            (close-socket-quietly socket))))
+      (let ((raw (usocket:socket-stream socket)))
+        (values socket
+                (if tls-p
+                    (cl+ssl:make-ssl-client-stream raw :hostname host :verify :required)
+                    raw))))))
 
 (defun close-socket-quietly (socket)
   (when socket

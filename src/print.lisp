@@ -188,12 +188,28 @@ shut from under a blocked reader."
         (send-print-run job socket)
         (return)))))
 
+(defparameter *keepalive-idle-seconds* 60)
+
+(defparameter *keepalive-interval-seconds* 10)
+
+(defparameter *keepalive-probes* 3)
+
 (defun keep-alive (socket)
   "Ask the kernel to probe the connection while it is idle.
 A relay holds its socket open for hours with nothing to say on it, so a relay
 that goes away without a close would otherwise leave the printer looking
-connected for as long as the process lives."
-  (ignore-errors (setf (usocket:socket-option socket :keepalive) t)))
+connected for as long as the process lives. The probes settle it in about a
+minute and a half."
+  (let ((raw (usocket:socket socket)))
+    (setf (sb-bsd-sockets:sockopt-keep-alive raw) t)
+    ;; When the probing starts and how often it repeats is a knob the platform
+    ;; may not offer; where it does not, its own timing stands.
+    (ignore-errors
+     (setf (sb-bsd-sockets:sockopt-tcp-keepidle raw) *keepalive-idle-seconds*))
+    (ignore-errors
+     (setf (sb-bsd-sockets:sockopt-tcp-keepintvl raw) *keepalive-interval-seconds*))
+    (ignore-errors
+     (setf (sb-bsd-sockets:sockopt-tcp-keepcnt raw) *keepalive-probes*))))
 
 (defun handle-relay-connection (socket)
   (let* ((line (read-relay-line socket 30 200))

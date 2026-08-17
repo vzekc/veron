@@ -161,6 +161,21 @@ RESPONDER receives the request path and returns a status and the body as octets.
                      "The connected printer should be the only ready one"))
         (usocket:socket-close socket)))))
 
+(define-test print-relay-connection-is-probed ()
+  "The connection is kept under keepalive, so a relay that goes away without a
+close does not leave the printer looking connected for the life of the process."
+  (with-print-listener (port)
+    (let ((printer (veron::find-printer "nec-p6"))
+          (socket (connect-relay port "nec-p6 test-token")))
+      (unwind-protect
+           (progn
+             (assert (wait-until (lambda () (veron::printer-relay printer))) ()
+                     "Relay should have been registered")
+             (assert (sb-bsd-sockets:sockopt-keep-alive
+                      (usocket:socket (veron::printer-relay printer)))
+                     () "Keepalive should be enabled on the relay connection"))
+        (ignore-errors (usocket:socket-close socket))))))
+
 (define-test print-registration-keeps-the-relay ()
   "Re-registering a printer, as a hot reload does, leaves its relay connected."
   (with-print-listener (port)

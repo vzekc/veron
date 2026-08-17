@@ -3,7 +3,7 @@
 	url = https://github.com/vzekc/woltlab-login
 [submodule "lispf"]
 	path = lispf
-	url = https://github.com/hanshuebner/lispf
+	url = https://code.netzhansa.com/hanshuebner/lispf
 [submodule "mel-base"]
 	path = mel-base
 	url = git@github.com:hanshuebner/mel-base.git

@@ -42,6 +42,9 @@ retry() {
 
 retry git fetch origin
 git reset --hard origin/main
+# An already-initialised submodule keeps the URL it was cloned from in
+# .git/config, so a submodule that has moved is picked up from .gitmodules here.
+git submodule sync --recursive
 retry git submodule update --init --recursive
 
 echo "=== Hot-reloading via Swank (port ${SWANK_PORT}) ==="

@@ -384,3 +384,56 @@ it is answered, so the server holds no descriptors of its own."
                      "Descriptor numbers climbed from ~D to ~D over 20 failed handshakes"
                      before after)))
       (funcall stop))))
+
+(defun start-greeting-server (&key (greet-after 0.2))
+  "A listener that waits, greets in the clear, and records what comes back.
+Returns the port, a function giving what the client sent before the greeting
+and after it, and a shutdown function."
+  (let* ((listener (usocket:socket-listen "127.0.0.1" 0
+                                          :element-type '(unsigned-byte 8)
+                                          :reuse-address t))
+         (port (usocket:get-local-port listener))
+         (before (list nil))
+         (after (list nil))
+         (thread (bt:make-thread
+                  (lambda ()
+                    (handler-case
+                        (let* ((socket (usocket:socket-accept listener))
+                               (stream (usocket:socket-stream socket)))
+                          (unwind-protect
+                               (progn
+                                 ;; Anything arriving in this window is the
+                                 ;; client speaking before it was greeted.
+                                 (sleep greet-after)
+                                 (setf (first before) (listen stream))
+                                 (write-sequence
+                                  (babel:string-to-octets
+                                   (format nil "INFO {\"tls_required\":true}~C~C"
+                                           #\Return #\Linefeed))
+                                  stream)
+                                 (finish-output stream)
+                                 (setf (first after) (read-byte stream nil nil)))
+                            (ignore-errors (usocket:socket-close socket))))
+                      (error () nil)))
+                  :name "greeting-nats-server")))
+    (values port
+            (lambda () (values (first before) (first after)))
+            (lambda ()
+              (ignore-errors (usocket:socket-close listener))
+              (ignore-errors (bt:destroy-thread thread))))))
+
+(define-test nats-tls-starts-after-the-greeting ()
+  "NATS greets in the clear and the connection is raised to TLS after it, so
+nothing may be sent before the INFO line has been read."
+  (multiple-value-bind (port traffic stop) (start-greeting-server)
+    (unwind-protect
+         (progn
+           (handler-case (veron.nats::open-socket "127.0.0.1" port :tls-p t)
+             (error () nil))
+           (multiple-value-bind (spoke-early first-byte) (funcall traffic)
+             (assert (not spoke-early) ()
+                     "The client sent something before it was greeted")
+             (assert (eql first-byte #x16) ()
+                     "Expected a TLS handshake record (#x16) after the greeting, got ~S"
+                     first-byte)))
+      (funcall stop))))

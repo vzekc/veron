@@ -203,19 +203,28 @@ Signals END-OF-FILE if the stream closes before CRLF is seen."
 ;;; Connection lifecycle
 
 (defun open-socket (host port &key tls-p)
-  "Open a TCP (or TLS) connection. Returns (values socket stream).
-The socket is closed if the TLS handshake fails, so that a server which cannot
-be negotiated with costs one attempt rather than one file descriptor a retry."
+  "Open a connection and read the server's greeting.
+Returns (values socket stream info).
+
+A NATS server speaks its INFO line in the clear and the connection is raised to
+TLS after it, so a TLS connection is made in that order: the greeting is read
+from the bare socket and the stream handed back is the encrypted one, which
+everything from CONNECT onwards travels over.
+
+The socket is closed if any of that fails, so that a server which cannot be
+negotiated with costs one attempt rather than one file descriptor a retry."
   (let ((socket (usocket:socket-connect host port
                                         :element-type '(unsigned-byte 8))))
     (handler-bind ((error (lambda (condition)
                             (declare (ignore condition))
                             (close-socket-quietly socket))))
-      (let ((raw (usocket:socket-stream socket)))
-        (values socket
-                (if tls-p
-                    (cl+ssl:make-ssl-client-stream raw :hostname host :verify :required)
-                    raw))))))
+      (let* ((raw (usocket:socket-stream socket))
+             (info (read-header-line raw))
+             (stream (if tls-p
+                         (cl+ssl:make-ssl-client-stream raw :hostname host
+                                                            :verify :required)
+                         raw)))
+        (values socket stream info)))))
 
 (defun close-socket-quietly (socket)
   (when socket
@@ -225,11 +234,10 @@ be negotiated with costs one attempt rather than one file descriptor a retry."
   (bt:with-lock-held ((client-state-lock client))
     (setf (client-state client) new-state)))
 
-(defun perform-handshake (client)
-  "Read the server INFO line and send CONNECT. Stream must already be set."
-  (let ((info (read-header-line (client-stream client))))
-    (unless (alexandria:starts-with-subseq "INFO " info)
-      (error "expected INFO from server, got: ~A" info)))
+(defun perform-handshake (client info)
+  "Check the server's greeting and send CONNECT over the established stream."
+  (unless (alexandria:starts-with-subseq "INFO " info)
+    (error "expected INFO from server, got: ~A" info))
   (multiple-value-bind (host port user pass)
       (parse-url (client-url client))
     (declare (ignore host port))
@@ -307,15 +315,17 @@ be negotiated with costs one attempt rather than one file descriptor a retry."
 (defun attempt-reconnect (client)
   "Connect the socket, perform handshake, start the reader thread,
 and re-subscribe. Signals on failure."
-  (multiple-value-bind (host port user pass tls-p) (parse-url (client-url client))
-    (declare (ignore user pass))
-    (multiple-value-bind (socket stream) (open-socket host port :tls-p tls-p)
-      (setf (client-host client) host
-            (client-port client) port
-            (client-tls-p client) tls-p
-            (client-socket client) socket
-            (client-stream client) stream)))
-  (perform-handshake client)
+  (let ((greeting nil))
+    (multiple-value-bind (host port user pass tls-p) (parse-url (client-url client))
+      (declare (ignore user pass))
+      (multiple-value-bind (socket stream info) (open-socket host port :tls-p tls-p)
+        (setf (client-host client) host
+              (client-port client) port
+              (client-tls-p client) tls-p
+              (client-socket client) socket
+              (client-stream client) stream
+              greeting info)))
+    (perform-handshake client greeting))
   (set-state client :connected)
   (let ((reader (bt:make-thread (lambda () (reader-loop client))
                                 :name "nats-reader")))

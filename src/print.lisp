@@ -223,11 +223,13 @@ minute and a half."
       (lispf:log-message :warn "fotodruck: Anmeldung von ~A abgewiesen"
                          (ignore-errors (usocket:get-peer-address socket)))
       (return-from handle-relay-connection))
+    ;; Set up the socket before it is registered, so that it is a fully
+    ;; configured connection by the time anything can find it.
+    (keep-alive socket)
     (unless (attach-relay printer socket)
       (lispf:log-message :warn "fotodruck: ~A druckt gerade, Verbindung abgewiesen"
                          (printer-name printer))
       (return-from handle-relay-connection))
-    (keep-alive socket)
     (lispf:log-message :info "fotodruck: ~A verbunden" (printer-name printer))
     (unwind-protect
          (serve-relay printer socket)

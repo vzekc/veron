@@ -188,6 +188,13 @@ shut from under a blocked reader."
         (send-print-run job socket)
         (return)))))
 
+(defun keep-alive (socket)
+  "Ask the kernel to probe the connection while it is idle.
+A relay holds its socket open for hours with nothing to say on it, so a relay
+that goes away without a close would otherwise leave the printer looking
+connected for as long as the process lives."
+  (ignore-errors (setf (usocket:socket-option socket :keepalive) t)))
+
 (defun handle-relay-connection (socket)
   (let* ((line (read-relay-line socket 30 200))
          (space (and line (position #\Space line)))
@@ -204,6 +211,7 @@ shut from under a blocked reader."
       (lispf:log-message :warn "fotodruck: ~A druckt gerade, Verbindung abgewiesen"
                          (printer-name printer))
       (return-from handle-relay-connection))
+    (keep-alive socket)
     (lispf:log-message :info "fotodruck: ~A verbunden" (printer-name printer))
     (unwind-protect
          (serve-relay printer socket)

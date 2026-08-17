@@ -100,8 +100,8 @@ in place.")
   (:documentation "One print run on its way to a printer."))
 
 (defun job-active-p (job)
-  "Return T while JOB is waiting to go out or going out."
-  (and job (member (print-job-state job) '(:queued :running))))
+  "Return T while JOB is waiting to go out, going out, or reaching the paper."
+  (and job (member (print-job-state job) '(:queued :running :draining))))
 
 (defparameter *relay-return-seconds* 30
   "How long a printer whose run has just ended is given for its relay to dial
@@ -138,15 +138,33 @@ gone away."
   "How long the sheet takes at the density it was ordered in."
   (print-resolution-seconds (print-job-resolution job)))
 
+(defparameter *print-drain-seconds* 10
+  "How much longer the printer works after the last byte of a run has gone out.
+The bytes on their way from here to the paper are worth about this much, so the
+sheet is not finished when the writing is.")
+
+(defparameter *estimate-warmup-seconds* 15
+  "How long a run goes before what has gone out says anything about its pace.")
+
+(defparameter *estimate-step-seconds* 15
+  "Estimates are rounded up to this, so that they do not read as more exact than
+they are.")
+
 (defun print-job-remaining-seconds (job)
-  "How much longer the sheet takes.
+  "How much longer the sheet takes, or NIL while that is still being measured.
 A printer that holds the run back stretches what is left along with it, so the
-figure follows the sheet rather than the schedule it was started on."
-  (let* ((fraction (print-job-fraction job))
-         (elapsed (- (get-universal-time) (print-job-started-at job)))
-         (expected (print-job-seconds job))
-         (projected (if (plusp fraction) (/ elapsed fraction) expected)))
-    (max 0 (round (* (- 1 fraction) (max expected projected))))))
+figure follows the sheet rather than the schedule it was started on, and the
+bytes still on their way to the paper are counted in."
+  (let ((elapsed (- (get-universal-time) (print-job-started-at job))))
+    (when (< elapsed *estimate-warmup-seconds*)
+      (return-from print-job-remaining-seconds nil))
+    (let* ((fraction (print-job-fraction job))
+           (expected (print-job-seconds job))
+           (projected (if (plusp fraction) (/ elapsed fraction) expected))
+           (left (+ (* (- 1 fraction) (max expected projected))
+                    *print-drain-seconds*)))
+      (* *estimate-step-seconds*
+         (max 1 (ceiling left *estimate-step-seconds*))))))
 
 ;;; The relay connection
 ;;;
@@ -349,7 +367,9 @@ the bytes go out on the schedule the density is printed at. What is left in the
 buffers between here and the paper then stays small, which makes the run end
 when the sheet does and the bytes gone out a fair measure of the sheet's
 progress. A printer slower than the schedule holds the writes back, and the
-figures follow it."
+figures follow it.
+The last bytes are still on their way to the paper when the writing is over, so
+the run waits out that much before it counts as finished."
   (let* ((data (print-job-data job))
          (total (length data))
          (started (get-internal-real-time)))
@@ -367,6 +387,8 @@ figures follow it."
                          (write-sequence data stream :start sent :end limit)
                          (force-output stream)
                          (setf (print-job-sent job) limit))))
+          (setf (print-job-state job) :draining)
+          (sleep *print-drain-seconds*)
           (finish-print-job job :done nil))
       (error (e)
         (finish-print-job job :failed (princ-to-string e))))

@@ -66,6 +66,13 @@ A printer slower than that schedule holds the writes back and the figures follow
 it. The relay's connection ends with the run and is dialled again, so a printer
 that has just printed reads as busy until it is back.
 
+What the visitor is told about the wait is kept to what is known. Nothing is
+claimed for the first `*estimate-warmup-seconds*`, where too little has gone out
+to judge the pace; after that the figure is rounded up to a quarter minute so it
+does not read as exact, and it carries `*print-drain-seconds*` for the bytes
+still between veron and the paper. The run waits that much out after its last
+write, reporting the sheet as nearly done, and only then as finished.
+
 The relay signs on with one line — the printer's name and the token — and
 everything after it travels the other way:
 

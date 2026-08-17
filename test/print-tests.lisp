@@ -31,16 +31,21 @@ against the sheet finishes while a test is watching."
                                  (veron::resolution 360 "Hoch" 3))))
 
 (defmacro with-print-listener ((port-var &key (token "test-token")) &body body)
-  "Run BODY with the Fotodruck listener up on a free port, then shut it down."
-  `(let ((,port-var (free-port)))
+  "Run BODY with the Fotodruck listener up on a free port, then shut it down.
+The printer it offers is the test one, and the run it waits out at the end is
+shortened to match, so a sheet takes seconds rather than minutes."
+  `(let ((,port-var (free-port))
+         (drain veron::*print-drain-seconds*))
      (setf (uiop:getenv "VERON_PRINT_PORT") (princ-to-string ,port-var)
-           (uiop:getenv "VERON_PRINT_TOKEN") ,token)
+           (uiop:getenv "VERON_PRINT_TOKEN") ,token
+           veron::*print-drain-seconds* 1)
      (register-test-printer)
      (unwind-protect
           (progn
             (veron::start-print-listener :host "127.0.0.1")
             ,@body)
        (veron::stop-print-listener)
+       (setf veron::*print-drain-seconds* drain)
        (dolist (printer veron::*printers*)
          (let ((relay (veron::printer-relay printer)))
            (when relay
@@ -355,6 +360,78 @@ close does not leave the printer looking connected for the life of the process."
                            resolutions))
             () "Printing times should be the ones the show measured")))
 
+;;; What the visitor is told about a run
+
+(defun make-test-job (&key (dpi 180) (sent 0) (total 1000))
+  "A job on the show's printer, with SENT of TOTAL bytes gone out."
+  (veron::register-show-printers)
+  (let* ((printer (veron::find-printer "nec-p6"))
+         (job (make-instance 'veron::print-job
+                             :printer printer
+                             :resolution (veron::find-resolution printer dpi)
+                             :username "testuser" :data nil :total total)))
+    (setf (veron::print-job-sent job) sent)
+    job))
+
+(define-test print-estimate-waits-for-a-measurement ()
+  "Nothing is claimed about a run's pace until it has been going long enough."
+  (let ((job (make-test-job :sent 500)))
+    (assert (null (veron::print-job-remaining-seconds job)) ()
+            "A run that has just started has nothing to say about its pace")
+    (let ((veron::*estimate-warmup-seconds* 0))
+      (assert (veron::print-job-remaining-seconds job) ()
+              "A run past the warmup should be given a time"))))
+
+(define-test print-estimate-in-quarter-minutes ()
+  "An estimate is rounded up to a step and carries the run's own tail."
+  (let ((veron::*estimate-warmup-seconds* 0))
+    (let* ((job (make-test-job :sent 500))
+           (sheet (veron::print-job-seconds job))
+           (remaining (veron::print-job-remaining-seconds job)))
+      (assert (zerop (mod remaining veron::*estimate-step-seconds*)) ()
+              "~D should be a whole number of steps" remaining)
+      (assert (>= remaining (+ (/ sheet 2) veron::*print-drain-seconds*)) ()
+              "~D should cover the half sheet left and the tail" remaining))
+    (let ((job (make-test-job :sent 1000)))
+      (assert (>= (veron::print-job-remaining-seconds job)
+                  veron::*estimate-step-seconds*)
+              () "A run whose writing is over still has its tail to go"))))
+
+(define-test print-busy-note-follows-the-run ()
+  "What a second visitor is told follows how far the sheet has got."
+  (let* ((job (make-test-job :sent 500))
+         (printer (veron::print-job-printer job)))
+    (unwind-protect
+         (progn
+           (setf (veron::printer-job printer) job
+                 (veron::print-job-state job) :running)
+           (assert (search "gemessen" (veron::busy-printer-note printer)) ()
+                   "A run too young to judge should say so, got ~S"
+                   (veron::busy-printer-note printer))
+           (let ((veron::*estimate-warmup-seconds* 0))
+             (assert (search "in ca." (veron::busy-printer-note printer)) ()
+                     "A run past the warmup should be given a time, got ~S"
+                     (veron::busy-printer-note printer)))
+           (setf (veron::print-job-state job) :draining)
+           (assert (search "gleich fertig" (veron::busy-printer-note printer)) ()
+                   "The tail of a run should read as nearly done, got ~S"
+                   (veron::busy-printer-note printer)))
+      (setf (veron::printer-job printer) nil))))
+
+(define-test print-status-says-nearly-done ()
+  "The tail of a run is reported as nearly done, and without a time."
+  (let ((job (make-test-job :sent 1000)))
+    (setf (veron::print-job-state job) :draining)
+    (let ((lines (format nil "~{~A~^~%~}" (veron::print-status-lines job))))
+      (assert (search "gleich fertig" lines) ()
+              "Should say the sheet is nearly done, got ~S" lines)
+      (assert (not (search "Fertig in" lines)) ()
+              "Should not offer a time once the writing is over, got ~S" lines))
+    (setf (veron::print-job-state job) :done)
+    (let ((lines (format nil "~{~A~^~%~}" (veron::print-status-lines job))))
+      (assert (search "Der Ausdruck ist fertig" lines) ()
+              "A finished run should say so, got ~S" lines))))
+
 ;;; Photo ids
 
 (define-test print-photo-id-validation ()
@@ -518,7 +595,7 @@ cursor to the density."
                (move-cursor s 8 14)
                (type-text s "k7np4m")
                (press-enter s)
-               (assert-message s "Aufloesung waehlen")
+               (assert-message s "Auflösung wählen")
                (assert-text-at s 8 14 6 "K7NP4M"
                                :description "The id should be taken up in capitals")
                (assert-cursor-at s 10 14
@@ -548,8 +625,10 @@ cursor to the density."
                (assert-on-screen s "FOTODRUCK")
                (assert (wait-for-screen-contains s "belegt" :timeout 3)
                        () "Should say the printer is busy")
-               (assert (wait-for-screen-contains s "Der laufende Auftrag" :timeout 3)
-                       () "Should say how much longer the running job needs")
+               ;; The run has only just started, so how long it still needs is
+               ;; being measured rather than claimed.
+               (assert (wait-for-screen-contains s "gemessen" :timeout 3)
+                       () "Should say the remaining time is being measured")
                (assert (not (search "kein Drucker verbunden"
                                     (format nil "~{~A~^~%~}" (screen-text s))))
                        () "A busy printer is not a printer that is gone")))
@@ -574,7 +653,9 @@ cursor to the density."
                  (assert (search "Hoch" full) () "Should offer the high density")
                  (assert (search "360 dpi" full) () "Should name the density")
                  (assert (search "NEC Pinwriter P6" full) ()
-                         "Should name the connected printer"))
+                         "Should name the connected printer")
+                 (assert (search "Auflösung" full) ()
+                         "Umlauts should survive the way to the terminal"))
                (assert (search "Niedrig" (screen-text-at s 10 17 50)) ()
                        "The coarsest density should be the first choice")
                (assert (search "Mittel" (screen-text-at s 11 17 50)) ()

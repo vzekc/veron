@@ -48,10 +48,14 @@
 (defun busy-printer-note (printer)
   "What to say while PRINTER still has a sheet to finish."
   (let ((job (printer-job printer)))
-    (if (job-active-p job)
-        (format nil "Der laufende Auftrag ist in ca. ~A fertig."
-                (print-duration-text (print-job-remaining-seconds job)))
-        "Der Drucker meldet sich gleich wieder.")))
+    (case (and job (print-job-state job))
+      ((:queued :running)
+       (if-let (remaining (print-job-remaining-seconds job))
+         (format nil "Der laufende Auftrag ist in ca. ~A fertig."
+                 (print-duration-text remaining))
+         "Wie lange der laufende Auftrag noch braucht, wird gerade gemessen."))
+      (:draining "Der laufende Auftrag ist gleich fertig.")
+      (t "Der Drucker meldet sich gleich wieder."))))
 
 ;;; The form
 
@@ -79,14 +83,14 @@
       ((and (null ready) busy)
        (setf info1 "Der Drucker ist zurzeit belegt."
              info2 (busy-printer-note busy)
-             info3 "Bitte spaeter noch einmal versuchen."))
+             info3 "Bitte später noch einmal versuchen."))
       ((null ready)
        (setf info1 "Zurzeit ist kein Drucker verbunden."
-             info2 "Bitte spaeter noch einmal versuchen."))
+             info2 "Bitte später noch einmal versuchen."))
       (t
-       (setf info1 "Foto-ID vom Beleg des Fotoautomaten eingeben und Aufloesung waehlen."
+       (setf info1 "Foto-ID vom Beleg des Fotoautomaten eingeben und Auflösung wählen."
              lbl-id "Foto-ID"
-             lbl-res "Aufloesung"
+             lbl-res "Auflösung"
              lbl-printer "Drucker")
        (if (rest ready)
            (setf pr1 (printer-choice-line ready 1)
@@ -102,9 +106,9 @@
 (defun print-run-error-message (reason)
   (case reason
     (:unknown "Diese Foto-ID ist unbekannt")
-    (:deleted "Dieses Foto wurde geloescht")
+    (:deleted "Dieses Foto wurde gelöscht")
     (:converting "Das Foto wird noch aufbereitet - bitte in einigen Minuten erneut versuchen")
-    (:missing "Fuer dieses Foto gibt es keinen Ausdruck in dieser Aufloesung")
+    (:missing "Für dieses Foto gibt es keinen Ausdruck in dieser Auflösung")
     (t "Die Fotoseite ist nicht erreichbar")))
 
 (lispf:define-key-handler fotodruck :enter (printer-sel photo-id res-sel)
@@ -112,7 +116,7 @@
          (printer (selected-item ready printer-sel)))
     (unless printer
       (lispf:application-error
-       (if ready "Bitte Drucker waehlen" "Zurzeit ist kein Drucker verfuegbar")))
+       (if ready "Bitte Drucker wählen" "Zurzeit ist kein Drucker verfügbar")))
     ;; The id is written back in the shape it is read in, so a correction is
     ;; made to what the printer will be asked for.
     (setf photo-id (string-upcase (string-trim " " photo-id)))
@@ -122,7 +126,7 @@
         (lispf:application-error "Bitte die sechsstellige Foto-ID vom Beleg eingeben"))
       (unless resolution
         (lispf:set-cursor-to-field "res-sel")
-        (lispf:application-error "Bitte Aufloesung waehlen"))
+        (lispf:application-error "Bitte Auflösung wählen"))
       (multiple-value-bind (data reason) (fetch-print-run printer resolution photo-id)
         (unless data
           (lispf:application-error (print-run-error-message reason)))
@@ -142,17 +146,22 @@
     (append
      (list ""
            (format nil "   Drucker     ~A" (printer-name printer))
-           (format nil "   Aufloesung  ~A (~D dpi)"
+           (format nil "   Auflösung   ~A (~D dpi)"
                    (print-resolution-label resolution)
                    (print-resolution-dpi resolution))
            "")
      (case (print-job-state job)
        ((:queued :running)
         (list (format nil "   Gedruckt    ~D%" (round (* 100 (print-job-fraction job))))
-              (format nil "   Fertig in   ca. ~A"
-                      (print-duration-text (print-job-remaining-seconds job)))
+              (if-let (remaining (print-job-remaining-seconds job))
+                (format nil "   Fertig in   ca. ~A" (print-duration-text remaining))
+                "   Fertig in   wird gemessen")
               ""
-              "   Der Ausdruck laeuft auch weiter, wenn Sie diese Anzeige verlassen."))
+              "   Der Ausdruck läuft auch weiter, wenn Du diese Anzeige verlässt."))
+       (:draining
+        (list "   Der Ausdruck ist gleich fertig."
+              ""
+              "   Die letzten Zeilen sind noch unterwegs zum Drucker."))
        (:done
         (list "   Der Ausdruck ist fertig."
               ""

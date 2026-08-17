@@ -112,7 +112,7 @@
 (lispf:define-screen-update user-edit ()
   (lispf:show-key :pf5 "Speichern")
   (lispf:show-key :pf6 "Passwort")
-  (lispf:show-key :pf9 "Loeschen"))
+  (lispf:show-key :pf9 "Löschen"))
 
 (lispf:define-key-handler user-edit :pf3 ()
   (confirm-if-dirty *user-edit-field-names* (lambda () :back)))
@@ -124,7 +124,7 @@
       (lispf:application-error "Benutzer nicht gefunden"))
     (let ((new-email (string-trim '(#\Space) email)))
       (when (and (plusp (length new-email)) (not (valid-email-p new-email)))
-        (lispf:application-error "Ungueltige E-Mail-Adresse"))
+        (lispf:application-error "Ungültige E-Mail-Adresse"))
       (update-user-email uid new-email)
       (if (field-enabled-p admin)
           (add-user-role uid :veron-administrator)
@@ -139,7 +139,7 @@
     (unless entry
       (lispf:application-error "Benutzer nicht gefunden"))
     (lispf:request-confirmation
-     (format nil "Kennwort fuer ~A zuruecksetzen?" (getf entry :name))
+     (format nil "Kennwort für ~A zurücksetzen?" (getf entry :name))
      (lambda ()
        (let ((password (reset-user-password uid)))
          (lispf:set-message :confirmation "Neues Passwort: ~A" password))
@@ -152,13 +152,13 @@
     (unless entry
       (lispf:application-error "Benutzer nicht gefunden"))
     (when (= uid (user-id current-user))
-      (lispf:application-error "Eigenen Benutzer kann man nicht loeschen"))
+      (lispf:application-error "Eigenen Benutzer kann man nicht löschen"))
     (lispf:request-confirmation
-     (format nil "Benutzer ~A loeschen?" (getf entry :name))
+     (format nil "Benutzer ~A löschen?" (getf entry :name))
      (lambda ()
        (delete-user uid)
        (setf (lispf:list-offset lispf:*session* 'users) 0)
-       (lispf:set-message :confirmation "Benutzer ~A geloescht" (getf entry :name))
+       (lispf:set-message :confirmation "Benutzer ~A gelöscht" (getf entry :name))
        :back))))
 
 ;;; New user screen
@@ -178,7 +178,7 @@
     (when (find-user-by-name name)
       (lispf:application-error "Benutzer existiert bereits"))
     (when (and (plusp (length mail)) (not (valid-email-p mail)))
-      (lispf:application-error "Ungueltige E-Mail-Adresse"))
+      (lispf:application-error "Ungültige E-Mail-Adresse"))
     (multiple-value-bind (user password) (create-local-user name mail)
       (declare (ignore user))
       (setf (lispf:list-offset lispf:*session* 'users) 0)

@@ -9,6 +9,6 @@
           (:from (2 22) :len 12 :name event-type :color yellow :repeat 18)
           (:from (2 35) :len 44 :name message :repeat 18)
           (:from (20 1) :len 30 :name page-info :color turquoise))
- :keys ((:pf3 "Zurueck" :back t)
+ :keys ((:pf3 "Zurück" :back t)
         (:pf7 "Vor." :hidden t)
-        (:pf8 "Naech." :hidden t)))
+        (:pf8 "Näch." :hidden t)))

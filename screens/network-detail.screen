@@ -22,4 +22,4 @@ Protokolle:
           (:from (8 14) :len 20 :name last-seen)
           (:from (11 3) :len 12 :name proto-name :color turquoise :repeat 7)
           (:from (11 16) :len 60 :name proto-desc :repeat 7))
- :keys ((:pf3 "Zurueck" :back t)))
+ :keys ((:pf3 "Zurück" :back t)))

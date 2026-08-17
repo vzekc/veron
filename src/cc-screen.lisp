@@ -33,7 +33,7 @@ key for tracking the scroll offset. Shows PF7/PF8 as needed."
     (when (> offset 0)
       (lispf:show-key :pf7 "Vor."))
     (when (< (+ offset page-size) total)
-      (lispf:show-key :pf8 "Naech."))))
+      (lispf:show-key :pf8 "Näch."))))
 
 (defun scroll-text (offset-key page-size total direction)
   "Adjust scroll offset. DIRECTION is :forward or :backward."

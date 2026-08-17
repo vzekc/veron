@@ -12,6 +12,6 @@
           (:from (2 56) :len 19 :name terminal-type :repeat 17)
           (:from (2 76) :len 3 :name tls :color turquoise :repeat 17)
           (:from (19 1) :len 30 :name page-info :color turquoise))
- :keys ((:pf3 "Zurueck" :back t)
+ :keys ((:pf3 "Zurück" :back t)
         (:pf7 "Vor." :hidden t)
-        (:pf8 "Naech." :hidden t)))
+        (:pf8 "Näch." :hidden t)))

@@ -7,6 +7,6 @@
 "
  :dynamic-areas ((:name inbox :from (2 3) :to (19 78)))
  :keys ((:enter "Gelesen")
-        (:pf3 "Zurueck" :back t)
+        (:pf3 "Zurück" :back t)
         (:pf5 "Alle gelesen")
-        (:pf9 "Alle loeschen")))
+        (:pf9 "Alle löschen")))

@@ -2,7 +2,7 @@
  :navigable t
  :screen "
 
-   Veranstaltung waehlen:
+   Veranstaltung wählen:
 
      Titel                    Datum        Ort
 "
@@ -11,7 +11,7 @@
           (:from (4 30) :len 12 :name dates :color turquoise :repeat 15)
           (:from (4 43) :len 35 :name location :repeat 15)
           (:from (19 1) :len 30 :name page-info :color turquoise))
- :keys ((:enter "Waehlen")
-        (:pf3 "Zurueck" :back t)
+ :keys ((:enter "Wählen")
+        (:pf3 "Zurück" :back t)
         (:pf7 "Vor." :hidden t)
-        (:pf8 "Naech." :hidden t)))
+        (:pf8 "Näch." :hidden t)))

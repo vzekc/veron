@@ -16,8 +16,8 @@
     (assert-on-screen s "MAIN")
     (assert (wait-for-screen-contains s "Wirklich abmelden?" :timeout 2)
             () "Confirmation message should appear")
-    (assert (wait-for-screen-contains s "Bestaetigen" :timeout 2)
-            () "PF5 Bestaetigen label should be visible")
+    (assert (wait-for-screen-contains s "Bestätigen" :timeout 2)
+            () "PF5 Bestätigen label should be visible")
     ;; PF5 confirms logout → goes to GOODBYE
     (press-key s :pf5)
     (assert-on-screen s "GOODBYE")))
@@ -33,8 +33,8 @@
     (assert-on-screen s "MAIN")
     (assert (wait-for-screen-contains s "Wirklich abmelden?" :timeout 2)
             () "Confirmation message should be visible")
-    (assert (wait-for-screen-contains s "Zurueck" :timeout 2)
-            () "PF3 Zurueck label should be visible")
+    (assert (wait-for-screen-contains s "Zurück" :timeout 2)
+            () "PF3 Zurück label should be visible")
     (assert (not (wait-for-screen-contains s "Abmelden" :timeout 1))
             () "Normal PF3 label should be hidden during confirmation")
     ;; PF3 cancels — back to normal MAIN

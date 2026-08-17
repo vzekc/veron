@@ -15,6 +15,6 @@
           (:from (19 1) :len 30 :name page-info :color turquoise))
  :keys ((:pf5 "Neu" :goto guestbook-new)
         (:enter "Anzeigen")
-        (:pf3 "Zurueck" :back t)
+        (:pf3 "Zurück" :back t)
         (:pf7 "Vor." :hidden t)
-        (:pf8 "Naech." :hidden t)))
+        (:pf8 "Näch." :hidden t)))

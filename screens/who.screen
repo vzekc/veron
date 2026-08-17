@@ -8,4 +8,4 @@
 "
  :fields ()
  :dynamic-areas ((:name sessions :from (2 0) :to (18 79)))
- :keys ((:pf3 "Zurueck" :back t)))
+ :keys ((:pf3 "Zurück" :back t)))

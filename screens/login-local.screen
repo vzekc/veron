@@ -11,4 +11,4 @@
           (:from (19 19) :len 60 :name password :write t :hidden t :transient t))
  :keys ((:enter "Login")
         (:pf2 "Passwort vergessen")
-        (:pf3 "Zurueck")))
+        (:pf3 "Zurück")))

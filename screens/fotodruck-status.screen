@@ -4,4 +4,4 @@
 "
  :fields ()
  :dynamic-areas ((:name status :from (0 0) :to (17 79)))
- :keys ((:pf3 "Zurueck" :back t)))
+ :keys ((:pf3 "Zurück" :back t)))

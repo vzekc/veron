@@ -9,6 +9,6 @@
           (:from (2 18) :len 15 :name range :color turquoise :repeat 17)
           (:from (2 34) :len 45 :name hosts :repeat 17)
           (:from (19 1) :len 30 :name page-info :color turquoise))
- :keys ((:pf3 "Zurueck" :back t)
+ :keys ((:pf3 "Zurück" :back t)
         (:pf7 "Vor." :hidden t)
-        (:pf8 "Naech." :hidden t)))
+        (:pf8 "Näch." :hidden t)))

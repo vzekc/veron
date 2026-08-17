@@ -9,5 +9,5 @@
 "
  :fields ((:from (3 22) :len 30 :name username :write t)
           (:from (4 22) :len 50 :name email :write t))
- :keys ((:pf3 "Zurueck")
+ :keys ((:pf3 "Zurück")
         (:pf5 "Anlegen")))

@@ -187,7 +187,7 @@ Cached as a session property for efficiency."
   (format nil "~A: Unbekannter Befehl" (string-upcase command)))
 
 (defmethod lispf:invalid-menu-selection-message ((app (eql *veron-app*)) selection)
-  (format nil "~A: Ungueltige Auswahl" selection))
+  (format nil "~A: Ungültige Auswahl" selection))
 
 (defmethod lispf:default-command-label ((app (eql *veron-app*)))
   "Befehl   ==>")
@@ -196,10 +196,10 @@ Cached as a session property for efficiency."
   "Auswahl ==>")
 
 (defmethod lispf:paging-labels ((app (eql *veron-app*)))
-  (values "Vor." "Naech."))
+  (values "Vor." "Näch."))
 
 (defmethod lispf:menu-key-labels ((app (eql *veron-app*)) &optional menu-name)
-  (values "Auswahl" (if (equal menu-name "main") "Abmelden" "Zurueck")))
+  (values "Auswahl" (if (equal menu-name "main") "Abmelden" "Zurück")))
 
 (defmethod lispf:session-authenticated-p ((app (eql *veron-app*)) session)
   (typep session 'authenticated-session))
@@ -306,7 +306,7 @@ Shows the single most significant unit: days, hours, or minutes."
        (setf password-label "")
        (lispf:set-field-attribute "password" :write nil)
        (unless (lispf:session-property lispf:*session* :message-line)
-         (lispf:set-message :error "Warnung: Verbindung ist nicht verschluesselt!"))))))
+         (lispf:set-message :error "Warnung: Verbindung ist nicht verschlüsselt!"))))))
 
 (lispf:define-key-handler login :enter (username password)
   (when (string= username "")
@@ -330,7 +330,7 @@ Shows the single most significant unit: days, hours, or minutes."
                                                  :db-password (env "VERON_AUTH_DB_PASSWORD")))
                          (authenticate-with-otp username password))))
          (unless result
-           (lispf:application-error "Ungueltiger Benutzername oder Passwort"))
+           (lispf:application-error "Ungültiger Benutzername oder Passwort"))
          (signal 'lispf:session-reset :data result)))
       ;; Non-TLS: user has local password
       ((has-local-password-p username)
@@ -416,7 +416,7 @@ confirmation message to avoid revealing whether the account exists."
         (when (< (length new-password) 6)
           (lispf:application-error "Passwort muss mindestens 6 Zeichen lang sein"))
         (unless (string= new-password confirm-password)
-          (lispf:application-error "Passwoerter stimmen nicht ueberein"))
+          (lispf:application-error "Passwörter stimmen nicht überein"))
         (let ((user (session-user lispf:*session*)))
           (save-local-password (user-id user) new-password)
           (lispf:set-message :confirmation "Passwort gespeichert"))
@@ -462,7 +462,7 @@ confirmation message to avoid revealing whether the account exists."
      (when (< (length new-password) 6)
        (lispf:application-error "Passwort muss mindestens 6 Zeichen lang sein"))
      (unless (string= new-password confirm-password)
-       (lispf:application-error "Passwoerter stimmen nicht ueberein"))
+       (lispf:application-error "Passwörter stimmen nicht überein"))
      (let ((user (session-user lispf:*session*)))
        (save-local-password (user-id user) new-password)
        (lispf:set-message :confirmation "Passwort gespeichert"))
@@ -516,7 +516,7 @@ confirmation message to avoid revealing whether the account exists."
                                             (mapcar #'string-upcase aliases))))))
     (lispf:show-help-page
      (make-instance 'lispf:help-page
-                    :title "Verfuegbare Befehle"
+                    :title "Verfügbare Befehle"
                     :lines lines))))
 
 (lispf:define-command *veron-app* (hilfe command)
@@ -627,7 +627,7 @@ Call from define-screen-enter after populating fields."
 Otherwise execute CALLBACK immediately."
   (if (apply #'fields-dirty-p field-names)
       (lispf:request-confirmation
-       "Aenderungen verwerfen?"
+       "Änderungen verwerfen?"
        callback)
       (funcall callback)))
 

@@ -12,4 +12,4 @@ Nachricht:
           (:from (3 0) :len 79 :name message :repeat 12)
           (:from (16 0) :len 79 :name confirm-prompt :color turquoise))
  :keys ((:pf5 "Speichern")
-        (:pf3 "Zurueck" :back t)))
+        (:pf3 "Zurück" :back t)))

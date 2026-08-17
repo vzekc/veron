@@ -13,7 +13,7 @@
 ;;; Known event types
 
 (defparameter *notification-events*
-  '((:guestbook . "Gaestebuch")
+  '((:guestbook . "Gästebuch")
     (:login . "Anmeldung")
     (:logout . "Abmeldung"))
   "Alist of (keyword . display-label) for notification event types.")

@@ -38,13 +38,13 @@
             message (getf entry :message))))
   (let ((user (session-user lispf:*session*)))
     (when (admin-p user)
-      (lispf:show-key :pf5 "Loeschen")))
+      (lispf:show-key :pf5 "Löschen")))
   (let ((index (lispf:session-property lispf:*session* :browse-index))
         (total (guestbook-count)))
     (when (and index (> index 0))
       (lispf:show-key :pf7 "Vor."))
     (when (and index (< index (1- total)))
-      (lispf:show-key :pf8 "Naech."))))
+      (lispf:show-key :pf8 "Näch."))))
 
 (defun browse-guestbook-entry (direction)
   "Navigate to prev (-1) or next (+1) guestbook entry. Returns :stay."
@@ -74,7 +74,7 @@
         (let ((entry-id (getf entry :id))
               (index (lispf:session-property lispf:*session* :browse-index)))
           (lispf:request-confirmation
-           "Gaestebucheintrag loeschen?"
+           "Gästebucheintrag löschen?"
            (lambda ()
              (delete-guestbook-entry entry-id)
              ;; Try to show the next entry (which now occupies the same index)
@@ -83,12 +83,12 @@
                (cond
                  (next
                   (setf (lispf:session-property lispf:*session* :browse-entry) next)
-                  (lispf:set-message :confirmation "Eintrag geloescht")
+                  (lispf:set-message :confirmation "Eintrag gelöscht")
                   :stay)
                  (t
                   (setf (lispf:session-property lispf:*session* :browse-entry) nil
                         (lispf:list-offset lispf:*session* 'guestbook) 0)
-                  (lispf:set-message :confirmation "Eintrag geloescht")
+                  (lispf:set-message :confirmation "Eintrag gelöscht")
                   :back))))))))))
 
 ;;; Guestbook new entry
@@ -141,8 +141,8 @@
                                  (list :id (user-id user)
                                        :username (user-username user)))
                         :payload (list :author author :message message)))
-      (notify :guestbook "Neuer Gaestebucheintrag"
-              (format nil "Neuer Gaestebucheintrag von ~A" author)
+      (notify :guestbook "Neuer Gästebucheintrag"
+              (format nil "Neuer Gästebucheintrag von ~A" author)
               :originator-user-id (when (typep lispf:*session* 'authenticated-session)
                                     (user-id (session-user lispf:*session*))))
       (setf (lispf:session-property lispf:*session* :new-entry-author) nil)

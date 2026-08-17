@@ -62,9 +62,9 @@
 (lispf:define-key-handler noti :pf9 ()
   (when (typep lispf:*session* 'authenticated-session)
     (lispf:request-confirmation
-     "Alle Nachrichten loeschen?"
+     "Alle Nachrichten löschen?"
      (lambda ()
        (clear-inbox (user-id (session-user lispf:*session*)))
        (update-notification-indicator)
-       (lispf:set-message :confirmation "Alle Nachrichten geloescht")
+       (lispf:set-message :confirmation "Alle Nachrichten gelöscht")
        :stay))))

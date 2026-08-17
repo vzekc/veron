@@ -127,7 +127,7 @@ or the first invalid entry string if validation fails."
       (progn
         (lispf:show-key :pf5 "Speichern")
         (unless (string= (lispf:session-property lispf:*session* :edit-lu-name) "DEFAULT")
-          (lispf:show-key :pf9 "Loeschen")))))
+          (lispf:show-key :pf9 "Löschen")))))
 
 (lispf:define-key-handler lu-config-edit :pf3 ()
   (confirm-if-dirty (if (lu-config-new-p)
@@ -157,7 +157,7 @@ Returns the upcased name, or signals an application error."
     (lu-name description disconnect single-instance allowed-ips secure
      init-screen locked notify-all)
   (alexandria:when-let (bad-ip (validate-allowed-ips allowed-ips))
-    (lispf:application-error (format nil "Ungueltige IP: ~A" bad-ip)))
+    (lispf:application-error (format nil "Ungültige IP: ~A" bad-ip)))
   (let ((init (clean-init-screen init-screen)))
     (if (lu-config-new-p)
         (let ((name (validate-lu-name lu-name)))
@@ -193,14 +193,14 @@ Returns the upcased name, or signals an application error."
 
 (lispf:define-key-handler lu-config-edit :pf9 ()
   (when (lu-config-new-p)
-    (lispf:application-error "Funktion nicht verfuegbar"))
+    (lispf:application-error "Funktion nicht verfügbar"))
   (let ((name (lispf:session-property lispf:*session* :edit-lu-name)))
     (when (string= name "DEFAULT")
-      (lispf:application-error "Standard LU kann nicht geloescht werden"))
+      (lispf:application-error "Standard LU kann nicht gelöscht werden"))
     (lispf:request-confirmation
-     (format nil "LU ~A loeschen?" name)
+     (format nil "LU ~A löschen?" name)
      (lambda ()
        (delete-lu-config name)
        (setf (lispf:list-offset lispf:*session* 'lu-config) 0)
-       (lispf:set-message :confirmation "LU ~A geloescht" name)
+       (lispf:set-message :confirmation "LU ~A gelöscht" name)
        :back))))

@@ -19,7 +19,7 @@
     (type-text s "99")
     (press-enter s)
     (assert-on-screen s "SYSTEM")
-    (assert (wait-for-screen-contains s "Ungueltige Auswahl" :timeout 2)
+    (assert (wait-for-screen-contains s "Ungültige Auswahl" :timeout 2)
             () "Should show invalid selection for invalid menu option")))
 
 ;;; Numeric option on submenu selects correct item

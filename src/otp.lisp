@@ -48,9 +48,9 @@
            smtp-host from email
            (format nil "VERON Einmalpasswort: ~A" code)
            (format nil "Hallo ~A,~%~%~
-               Dein Einmalpasswort fuer VERON ist: ~A~%~%~
-               Das Passwort ist 5 Minuten gueltig.~%~%~
-               Da Deine Verbindung nicht verschluesselt ist, kannst Du Dich ~
+               Dein Einmalpasswort für VERON ist: ~A~%~%~
+               Das Passwort ist 5 Minuten gültig.~%~%~
+               Da Deine Verbindung nicht verschlüsselt ist, kannst Du Dich ~
                nicht mit Deinem Forum-Passwort anmelden. Nach der Anmeldung ~
                mit dem Einmalpasswort wirst Du aufgefordert, ein lokales ~
                Passwort zu setzen. Bitte verwende ein Passwort, das Du ~
@@ -116,7 +116,7 @@ Signals application-error on failure."
     (when (string= code "")
       (lispf:application-error "Bitte Einmalpasswort eingeben"))
     (unless (string= username (session-otp-username session))
-      (lispf:application-error "Benutzername stimmt nicht ueberein"))
+      (lispf:application-error "Benutzername stimmt nicht überein"))
     (let ((stored-code (get-active-otp username)))
       (unless stored-code
         (lispf:application-error "Einmalpasswort abgelaufen"))
@@ -126,7 +126,7 @@ Signals application-error on failure."
         (lispf:application-error "Zu viele Fehlversuche"))
       (unless (string= code stored-code)
         (lispf:application-error
-         (format nil "Ungueltiges Einmalpasswort (~D Versuche verbleibend)"
+         (format nil "Ungültiges Einmalpasswort (~D Versuche verbleibend)"
                  (- 3 (session-otp-attempts session))))))
     ;; Code valid, consume it
     (clear-otp username)
@@ -144,5 +144,5 @@ Signals application-error on failure."
     (lispf:application-error "Bitte Benutzername und Passwort eingeben"))
   (let ((result (authenticate-local username password)))
     (unless result
-      (lispf:application-error "Ungueltiges Passwort"))
+      (lispf:application-error "Ungültiges Passwort"))
     (signal 'lispf:session-reset :data result)))

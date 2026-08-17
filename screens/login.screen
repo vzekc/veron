@@ -29,5 +29,5 @@
  :keys ((:enter "Login")
         (:pf2 "Passwort vergessen" :hidden t)
         (:pf3 "Trennen")
-        (:pf4 "Gaestebuch" :goto guestbook)
+        (:pf4 "Gästebuch" :goto guestbook)
         (:pf6 "Hilfe" :goto hilfe)))

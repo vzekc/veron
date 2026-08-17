@@ -99,9 +99,9 @@ Content col maps directly to physical col (data starts at the :from col)."
     ;; Edit again and delete
     (open-lu-for-edit s "TESTLU01")
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (assert (wait-for-screen-contains s "geloescht" :timeout 3)
+    (assert (wait-for-screen-contains s "gelöscht" :timeout 3)
             () "Should see delete confirmation message")
     ;; Verify the LU is not in the data rows (row 3+), ignoring the message line (row 22)
     (let ((found (loop for r from 3 to 19
@@ -169,9 +169,9 @@ Content col maps directly to physical col (data starts at the :from col)."
               "Allowed-ips should be 192.168.1.0/24, got ~S" allowed-ips))
     ;; Clean up
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (wait-for-screen-contains s "geloescht" :timeout 3)))
+    (wait-for-screen-contains s "gelöscht" :timeout 3)))
 
 ;;; Flag toggle: create with J, edit to N, verify N persists
 
@@ -202,9 +202,9 @@ Content col maps directly to physical col (data starts at the :from col)."
       (assert (string= si "N") () "Single-instance should be N after toggle, got ~S" si))
     ;; Clean up
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (wait-for-screen-contains s "geloescht" :timeout 3)))
+    (wait-for-screen-contains s "gelöscht" :timeout 3)))
 
 ;;; Flag values: Y and X also enable, N disables
 
@@ -246,9 +246,9 @@ Content col maps directly to physical col (data starts at the :from col)."
       (assert (string= si "N") () "N should disable, display as N, got ~S" si))
     ;; Clean up
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (wait-for-screen-contains s "geloescht" :timeout 3)))
+    (wait-for-screen-contains s "gelöscht" :timeout 3)))
 
 ;;; Invalid IP validation
 
@@ -274,7 +274,7 @@ Content col maps directly to physical col (data starts at the :from col)."
     (press-pf s 5)
     ;; Should still be on edit screen with error
     (assert-on-screen s "LU-CONFIG-EDIT")
-    (assert-screen-contains s "Ungueltige IP")
+    (assert-screen-contains s "Ungültige IP")
     (assert-screen-contains s "not-an-ip")
     ;; Press PF3 to go back without saving (confirm discard)
     (back-with-discard s)
@@ -298,9 +298,9 @@ Content col maps directly to physical col (data starts at the :from col)."
     ;; Clean up
     (open-lu-for-edit s "GOODIPLU")
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (wait-for-screen-contains s "geloescht" :timeout 3)))
+    (wait-for-screen-contains s "gelöscht" :timeout 3)))
 
 ;;; Mixed valid/invalid IPs - error on the invalid entry
 
@@ -326,7 +326,7 @@ Content col maps directly to physical col (data starts at the :from col)."
     (press-pf s 5)
     ;; Should show error about "bad"
     (assert-on-screen s "LU-CONFIG-EDIT")
-    (assert-screen-contains s "Ungueltige IP")
+    (assert-screen-contains s "Ungültige IP")
     (assert-screen-contains s "bad")
     (back-with-discard s)
     (assert-on-screen s "LU-CONFIG")))
@@ -352,7 +352,7 @@ Content col maps directly to physical col (data starts at the :from col)."
     (type-text s "garbage")
     (press-pf s 5)
     ;; Should show error, not save
-    (assert-screen-contains s "Ungueltige IP")
+    (assert-screen-contains s "Ungültige IP")
     (assert-screen-contains s "garbage")
     ;; Go back and verify the LU still has no IPs
     (back-with-discard s)
@@ -361,9 +361,9 @@ Content col maps directly to physical col (data starts at the :from col)."
       (assert (string= ips "") () "IPs should still be empty, got ~S" ips))
     ;; Clean up
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (wait-for-screen-contains s "geloescht" :timeout 3)))
+    (wait-for-screen-contains s "gelöscht" :timeout 3)))
 
 ;;; Unified screen: lu-name is writable in new mode, read-only in edit mode
 
@@ -391,9 +391,9 @@ Content col maps directly to physical col (data starts at the :from col)."
     (assert-screen-contains s "Speichern")
     ;; Clean up
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (wait-for-screen-contains s "geloescht" :timeout 3)))
+    (wait-for-screen-contains s "gelöscht" :timeout 3)))
 
 ;;; Secure flag: create with secure=J, verify on edit and list
 
@@ -434,9 +434,9 @@ Content col maps directly to physical col (data starts at the :from col)."
       (assert (string= secure "N") () "Secure should be N after toggle, got ~S" secure))
     ;; Clean up
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (wait-for-screen-contains s "geloescht" :timeout 3)))
+    (wait-for-screen-contains s "gelöscht" :timeout 3)))
 
 ;;; Secure flag defaults to N for new LU
 
@@ -454,9 +454,9 @@ Content col maps directly to physical col (data starts at the :from col)."
       (assert (string= secure "N") () "Secure should default to N, got ~S" secure))
     ;; Clean up
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (wait-for-screen-contains s "geloescht" :timeout 3)))
+    (wait-for-screen-contains s "gelöscht" :timeout 3)))
 
 ;;; LU name validation: must start with letter, alphanumeric only, auto-upcased
 
@@ -489,6 +489,6 @@ Content col maps directly to physical col (data starts at the :from col)."
     ;; Clean up
     (open-lu-for-edit s "TESTLU")
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (wait-for-screen-contains s "geloescht" :timeout 3)))
+    (wait-for-screen-contains s "gelöscht" :timeout 3)))

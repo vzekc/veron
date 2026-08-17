@@ -13,5 +13,5 @@ Anfassen..:
           (:from (6 3) :len 18 :name attr-name :color turquoise :repeat 13)
           (:from (6 22) :len 1 :name attr-sep :repeat 13)
           (:from (6 24) :len 54 :name attr-value :repeat 13))
- :keys ((:pf3 "Zurueck" :back t)
+ :keys ((:pf3 "Zurück" :back t)
         (:pf4 "Beschreibung" :hidden t)))

@@ -40,11 +40,11 @@
         (progn
           (lispf:hide-key :pf3)
           (lispf:show-key :enter "Weiter"))
-        (lispf:show-key :pf3 "Zurueck"))
+        (lispf:show-key :pf3 "Zurück"))
     (when (> offset 0)
       (lispf:show-key :pf7 "Vor."))
     (when (< (+ offset +changelog-display-lines+) total)
-      (lispf:show-key :pf8 "Naech."))
+      (lispf:show-key :pf8 "Näch."))
     (when (and user (admin-p user))
       (lispf:show-key :pf4 "Bearbeiten")
       (lispf:show-key :pf5 "Neu"))))

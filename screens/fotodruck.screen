@@ -20,4 +20,4 @@
           (:from (14 17) :len 50 :name pr2 :color green)
           (:from (15 17) :len 50 :name pr3 :color green))
  :keys ((:enter "Drucken" :hidden t)
-        (:pf3 "Zurueck" :back t)))
+        (:pf3 "Zurück" :back t)))

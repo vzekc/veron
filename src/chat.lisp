@@ -151,9 +151,9 @@ TYPE is :message or :notification. Returns the message plist."
   "Number of lines available for chat message display (rows 0-17).")
 
 (defparameter *german-numbers*
-  #("null" "eins" "zwei" "drei" "vier" "fuenf" "sechs" "sieben"
-    "acht" "neun" "zehn" "elf" "zwoelf" "dreizehn" "vierzehn"
-    "fuenfzehn" "sechzehn" "siebzehn" "achtzehn" "neunzehn" "zwanzig"))
+  #("null" "eins" "zwei" "drei" "vier" "fünf" "sechs" "sieben"
+    "acht" "neun" "zehn" "elf" "zwölf" "dreizehn" "vierzehn"
+    "fünfzehn" "sechzehn" "siebzehn" "achtzehn" "neunzehn" "zwanzig"))
 
 (defun number-to-german (n)
   "Convert a non-negative integer to German words."

@@ -85,13 +85,13 @@
     (assert-on-screen s "GOODBYE")
     ;; Row 19 = "Vielen Dank ... Mal!" line (title at row 0, content row 18)
     ;; Check that "Mal!" is inside the turquoise field, not after an SF reset.
-    ;; In the buffer, the hex for "n Mal!" (end of "naechsten Mal!") must be
+    ;; In the buffer, the hex for "n Mal!" (end of "nächsten Mal!") must be
     ;; contiguous without any SF(...) marker splitting the text.
     (let* ((buffer-rows (read-buffer s))
            (row (nth 19 buffer-rows)))
       (assert (not (cl-ppcre:scan "6e SF\\(" row)) ()
               "Goodbye farewell message: 'Mal!' must be inside turquoise field, ~
-               but found SF marker after 'naechsten'"))))
+               but found SF marker after 'nächsten'"))))
 
 ;;; Connection drop (client disconnect) should also record logout time.
 

@@ -125,7 +125,7 @@ The :CONTENT value is decoded to a string for text types, raw octets for binary.
       (unless (db-null-p result) result))))
 
 (defvar *notes-welcome-text*
-  "Dies ist deine persoenliche Notizdatei.  Du kannst sie nach
+  "Dies ist deine persönliche Notizdatei.  Du kannst sie nach
 Belieben mit dem Editor bearbeiten.  Mit PF1 gibt es Hilfe
 zum Editor."
   "Welcome text for newly created notes files.")

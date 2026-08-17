@@ -1,23 +1,23 @@
 (:name "retrostar-about"
  :screen "
 
-   Ueber RetroStar
+   Über RetroStar
 
    RetroStar ist ein Sternrechner, der Computer mit antiken
    Netzwerkprotokollen verbindet. Teilnehmer verwenden einen
    Raspberry Pi, um ihr Retro-Ethernet mit den Netzen der anderen
    Teilnehmer zu verbinden. Dabei fungiert RetroStar als Bridge,
-   und die Netze verhalten sich so, als waeren sie direkt
+   und die Netze verhalten sich so, als wären sie direkt
    miteinander verbunden.
 
-   Die Internet-Protokolle (IP, IPv6 und ARP) werden nicht ueber
+   Die Internet-Protokolle (IP, IPv6 und ARP) werden nicht über
    RetroStar weitergeleitet.
 
    Die ersten Benutzer des RetroStar benutzen DECnet und LAT, um
    ihre Systeme von Digital Equipment miteinander zu verbinden. Es
-   ist aber auch moeglich, andere Protokolle wie IPX oder Ethertalk
+   ist aber auch möglich, andere Protokolle wie IPX oder Ethertalk
    zu verwenden.
 
    RetroStar ist ein Projekt des V.z.E.k.C. e.V.
 "
- :keys ((:pf3 "Zurueck" :back t)))
+ :keys ((:pf3 "Zurück" :back t)))

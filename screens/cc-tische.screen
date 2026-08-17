@@ -10,6 +10,6 @@
           (:from (2 36) :len 5 :name exhibit-count :repeat 18)
           (:from (20 1) :len 30 :name page-info :color turquoise))
  :keys ((:enter "Aussteller")
-        (:pf3 "Zurueck" :back t)
+        (:pf3 "Zurück" :back t)
         (:pf7 "Vor." :hidden t)
-        (:pf8 "Naech." :hidden t)))
+        (:pf8 "Näch." :hidden t)))

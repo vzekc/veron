@@ -83,7 +83,7 @@ Elides with '...' if names don't fit."
     (update-chat-indicators))
   (let ((total (length (chat-all-formatted-lines))))
     (when (> total +chat-display-lines+)
-      (lispf:show-key :pf7 "Aeltere"))
+      (lispf:show-key :pf7 "Ältere"))
     (when (chat-scroll-offset)
       (lispf:show-key :pf6 "Neueste")
       (lispf:show-key :pf8 "Neuere"))))

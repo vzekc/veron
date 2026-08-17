@@ -166,9 +166,9 @@
     (assert (wait-for-screen-contains s "Abmeldung-Test" :timeout 3)
             () "Should see the notification")
     (press-pf s 9)
-    (assert-screen-contains s "loeschen")
+    (assert-screen-contains s "löschen")
     (press-pf s 5)
-    (assert (wait-for-screen-contains s "geloescht" :timeout 3)
+    (assert (wait-for-screen-contains s "gelöscht" :timeout 3)
             () "Should see delete confirmation")
     ;; Verify inbox is empty
     (veron::with-db
@@ -324,7 +324,7 @@
 (define-test e2e-notification-menu-item ()
   (with-veron-app (s :username "notifuser10" :password "notifpass10")
     (login s "notifuser10" "notifpass10")
-    (select-menu-item s "Persoenlich")
+    (select-menu-item s "Persönlich")
     (assert-on-screen s "PERSONAL")
     (assert-screen-contains s "Benachrichtigungen")
     ;; noti screen is navigable

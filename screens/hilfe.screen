@@ -3,4 +3,4 @@
  :screen "
 "
  :fields ()
- :keys ((:pf3 "Zurueck" :back t)))
+ :keys ((:pf3 "Zurück" :back t)))

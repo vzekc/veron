@@ -9,7 +9,7 @@
    Signalton:
 
    Ereignis                        Ntfy  Lokal
-   Gaestebuch
+   Gästebuch
    Anmeldung
    Abmeldung
 "
@@ -21,6 +21,6 @@
           (:from (8 43) :len 1 :name local-login :write t :highlighting underscore)
           (:from (9 37) :len 1 :name ntfy-logout :write t :highlighting underscore)
           (:from (9 43) :len 1 :name local-logout :write t :highlighting underscore))
- :keys ((:pf3 "Zurueck" :back t)
+ :keys ((:pf3 "Zurück" :back t)
         (:pf5 "Speichern")
         (:pf9 "Alle an/aus")))

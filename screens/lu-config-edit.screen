@@ -25,6 +25,6 @@
           (:from (10 22) :len 30 :name init-screen :write t)
           (:from (11 22) :len 1 :name locked :write t :highlighting underscore)
           (:from (12 22) :len 1 :name notify-all :write t :highlighting underscore))
- :keys ((:pf3 "Zurueck")
+ :keys ((:pf3 "Zurück")
         (:pf5 "Speichern" :hidden t)
-        (:pf9 "Loeschen" :hidden t)))
+        (:pf9 "Löschen" :hidden t)))

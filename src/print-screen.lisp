@@ -58,50 +58,72 @@
       (t "Der Drucker meldet sich gleich wieder."))))
 
 ;;; The form
+;;;
+;;; What the screen has to say about the printer sits in a dynamic area, so that
+;;; a visitor kept waiting watches the wait shorten instead of a frozen page.
+;;; Everything the form is made of — the labels, the fields, the Enter key — is
+;;; there only while there is something to print on, and the update cycle asks
+;;; for the screen afresh when that changes.
 
-(lispf:define-screen-update fotodruck (info1 info2 info3
-                                       lbl-printer printer-sel pr1 pr2 pr3
+(defparameter *info-color* "^t"
+  "The dynamic info area is turquoise, as the fields it replaced were.")
+
+(defun fotodruck-info-lines ()
+  "The three lines that say what can be printed just now, or why nothing can."
+  (mapcar (lambda (line) (if (plusp (length line))
+                             (format nil "~A   ~A" *info-color* line)
+                             ""))
+          (let ((busy (find-if #'printer-busy-p *printers*)))
+            (cond
+              ((not (fotodruck-configured-p))
+               (list "Der Fotodruck ist auf diesem System nicht konfiguriert." "" ""))
+              ((ready-printers)
+               (list "Foto-ID vom Beleg des Fotoautomaten eingeben und Auflösung wählen."
+                     "" ""))
+              (busy
+               (list "Der Drucker ist zurzeit belegt."
+                     (busy-printer-note busy)
+                     "Diese Anzeige aktualisiert sich selbst."))
+              (t
+               (list "Zurzeit ist kein Drucker verbunden."
+                     "Bitte später noch einmal versuchen." ""))))))
+
+(lispf:define-dynamic-area-updater fotodruck info ()
+  (fotodruck-info-lines))
+
+(lispf:define-screen-update fotodruck (lbl-printer printer-sel pr1 pr2 pr3
                                        lbl-id photo-id
                                        lbl-res res-sel rs1 rs2 rs3)
-  (setf info1 "" info2 "" info3 ""
-        lbl-printer "" pr1 "" pr2 "" pr3 ""
+  (setf lbl-printer "" pr1 "" pr2 "" pr3 ""
         lbl-id "" lbl-res "" rs1 "" rs2 "" rs3 "")
-  (let ((ready (ready-printers))
-        (busy (find-if #'printer-busy-p *printers*)))
+  (let ((ready (ready-printers)))
+    ;; What the update cycle compares against to notice the wait is over.
+    (setf (lispf:session-property lispf:*session* :fotodruck-waiting) (null ready))
     (if ready
         (lispf:show-key :enter "Drucken")
-        ;; Nothing to fill in when there is nothing to print on.
+        ;; Nothing to fill in when there is nothing to print on, so the cursor
+        ;; waits on the line that says why rather than under the key labels.
         (progn
           (setf photo-id "" res-sel "" printer-sel "")
           (dolist (field '("photo-id" "res-sel" "printer-sel"))
-            (lispf:set-field-attribute field :write nil))))
+            (lispf:set-field-attribute field :write nil))
+          (lispf:set-cursor 4 3)))
     (unless (rest ready)
       (lispf:set-field-attribute "printer-sel" :write nil))
-    (cond
-      ((not (fotodruck-configured-p))
-       (setf info1 "Der Fotodruck ist auf diesem System nicht konfiguriert."))
-      ((and (null ready) busy)
-       (setf info1 "Der Drucker ist zurzeit belegt."
-             info2 (busy-printer-note busy)
-             info3 "Bitte später noch einmal versuchen."))
-      ((null ready)
-       (setf info1 "Zurzeit ist kein Drucker verbunden."
-             info2 "Bitte später noch einmal versuchen."))
-      (t
-       (setf info1 "Foto-ID vom Beleg des Fotoautomaten eingeben und Auflösung wählen."
-             lbl-id "Foto-ID"
-             lbl-res "Auflösung"
-             lbl-printer "Drucker")
-       (if (rest ready)
-           (setf pr1 (printer-choice-line ready 1)
-                 pr2 (printer-choice-line ready 2)
-                 pr3 (printer-choice-line ready 3))
-           (setf pr1 (printer-name (first ready))))
-       (let ((resolutions (printer-resolutions
-                           (or (selected-item ready printer-sel) (first ready)))))
-         (setf rs1 (resolution-choice-line resolutions 1)
-               rs2 (resolution-choice-line resolutions 2)
-               rs3 (resolution-choice-line resolutions 3)))))))
+    (when ready
+      (setf lbl-id "Foto-ID"
+            lbl-res "Auflösung"
+            lbl-printer "Drucker")
+      (if (rest ready)
+          (setf pr1 (printer-choice-line ready 1)
+                pr2 (printer-choice-line ready 2)
+                pr3 (printer-choice-line ready 3))
+          (setf pr1 (printer-name (first ready))))
+      (let ((resolutions (printer-resolutions
+                          (or (selected-item ready printer-sel) (first ready)))))
+        (setf rs1 (resolution-choice-line resolutions 1)
+              rs2 (resolution-choice-line resolutions 2)
+              rs3 (resolution-choice-line resolutions 3))))))
 
 (defun print-run-error-message (reason)
   (case reason
@@ -136,7 +158,9 @@
           (unless job
             (lispf:application-error "Der Drucker ist inzwischen belegt"))
           (setf (lispf:session-property lispf:*session* :print-job) job)
-          'fotodruck-status)))))
+          ;; The form has done its job once the sheet is on its way, so the
+          ;; status takes its place and leaving the status reaches the menu.
+          (cons :replace 'fotodruck-status))))))
 
 ;;; The sheet coming out
 
@@ -171,6 +195,23 @@
               ""
               (format nil "   ~A" (or (print-job-message job) ""))))))))
 
+(lispf:define-screen-update fotodruck-status ()
+  ;; Nothing to type here, so the cursor waits at the head of the report rather
+  ;; than under the key labels.
+  (lispf:set-cursor 2 3))
+
 (lispf:define-dynamic-area-updater fotodruck-status status ()
   (when-let (job (lispf:session-property lispf:*session* :print-job))
     (print-status-lines job)))
+
+;;; Waiting for the printer
+;;;
+;;; The form is built from what the printer can do, so a wait that ends has to
+;;; reach the screen as a fresh build rather than as new text in the info area.
+
+(defun fotodruck-wait-is-over-p ()
+  "Return T when the session sits on a Fotodruck form that has become usable."
+  (and (eq (lispf:session-current-screen lispf:*session*) 'fotodruck)
+       (lispf:session-property lispf:*session* :fotodruck-waiting)
+       (ready-printers)
+       t))

@@ -467,7 +467,31 @@ close does not leave the printer looking connected for the life of the process."
       (assert (wait-for-screen-contains s "kein Drucker verbunden" :timeout 3)
               () "Should say no printer is connected")
       (assert (not (search "Foto-ID" (format nil "~{~A~^~%~}" (screen-text s))))
-              () "Should not ask for a photo id when there is no printer"))))
+              () "Should not ask for a photo id when there is no printer")
+      (assert-cursor-at s 4 3
+                        :description "Cursor should wait on the line that says why"))))
+
+(define-test e2e-fotodruck-wait-updates-itself ()
+  "A visitor kept waiting sees the form arrive when a printer does, without
+touching the keyboard."
+  (with-print-listener (port)
+    (let ((printer (veron::find-printer "nec-p6"))
+          (relay nil))
+      (unwind-protect
+           (with-veron-app (s :username "printuser9" :password "printpass9")
+             (login s "printuser9" "printpass9")
+             (select-menu-item s "Fotodruck")
+             (assert (wait-for-screen-contains s "kein Drucker verbunden" :timeout 3)
+                     () "Should start out with nothing to print on")
+             ;; The relay dials in while the visitor sits on the waiting page.
+             (setf relay (connect-relay port "nec-p6 test-token"))
+             (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
+                     "Printer should become ready")
+             (assert (wait-for-screen-contains s "Foto-ID" :timeout 5)
+                     () "The form should arrive on its own once there is a printer")
+             (assert-cursor-at s 8 14
+                               :description "Cursor should be on the id field"))
+        (when relay (ignore-errors (usocket:socket-close relay)))))))
 
 (defun test-print-run (length)
   (let ((data (make-array length :element-type '(unsigned-byte 8))))
@@ -508,6 +532,8 @@ close does not leave the printer looking connected for the life of the process."
                  (type-text s "2")
                  (press-enter s)
                  (assert-on-screen s "FOTODRUCK-STATUS")
+                 (assert-cursor-at s 2 3
+                                   :description "Cursor should head the report")
                  (let ((received (read-until-eof relay)))
                    (assert (= (length run) (length received)) ()
                            "Expected ~D bytes at the relay, got ~D"
@@ -517,7 +543,11 @@ close does not leave the printer looking connected for the life of the process."
                          () "The status screen should report the sheet as finished")
                  (let ((full (format nil "~{~A~^~%~}" (screen-text s))))
                    (assert (search "NEC Pinwriter P6" full) () "Should name the printer")
-                   (assert (search "180 dpi" full) () "Should name the density"))))
+                   (assert (search "180 dpi" full) () "Should name the density"))
+                 ;; The form is done with once the sheet is on its way, so
+                 ;; leaving the report reaches the menu rather than the form.
+                 (press-pf s 3)
+                 (assert-on-screen s "MAIN")))
           (ignore-errors (usocket:socket-close relay)))))))
 
 (define-test e2e-fotodruck-unknown-id ()
@@ -661,5 +691,7 @@ cursor to the density."
                (assert (search "Mittel" (screen-text-at s 11 17 50)) ()
                        "The middle density should be the second choice")
                (assert (search "Hoch" (screen-text-at s 12 17 50)) ()
-                       "The finest density should be the last choice")))
+                       "The finest density should be the last choice")
+               (assert-cursor-at s 8 14
+                                 :description "Cursor should be on the id field")))
         (ignore-errors (usocket:socket-close socket))))))

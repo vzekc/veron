@@ -73,6 +73,13 @@ does not read as exact, and it carries `*print-drain-seconds*` for the bytes
 still between veron and the paper. The run waits that much out after its last
 write, reporting the sheet as nearly done, and only then as finished.
 
+A visitor who arrives while the printer is busy waits on a page that keeps
+itself current: the notice sits in a dynamic area, so the time left shrinks as
+they watch, and the update cycle asks for the screen afresh once a printer is
+free, which is when the form itself appears. Starting a run replaces the form
+with the report on it, so leaving the report reaches the menu rather than a
+form that has already been sent.
+
 The relay signs on with one line — the printer's name and the token — and
 everything after it travels the other way:
 

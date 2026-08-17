@@ -6,10 +6,8 @@
 
    Ein Foto vom Fotoautomaten auf Papier ausgeben.
 "
- :fields ((:from (3 3) :len 74 :name info1 :color turquoise)
-          (:from (4 3) :len 74 :name info2 :color turquoise)
-          (:from (5 3) :len 74 :name info3 :color turquoise)
-          (:from (7 3) :len 10 :name lbl-id)
+ :dynamic-areas ((:name info :from (3 0) :to (5 79)))
+ :fields ((:from (7 3) :len 10 :name lbl-id)
           (:from (7 14) :len 6 :name photo-id :write t :intense t :highlighting underscore)
           (:from (9 3) :len 10 :name lbl-res)
           (:from (9 14) :len 1 :name res-sel :write t :intense t :highlighting underscore)

@@ -814,7 +814,11 @@ Otherwise, if the changelog has unread entries, go to changelog; otherwise main.
 ;;; Update cycle hook — notification delivery to error line and MSG indicator
 
 (defmethod lispf:update-cycle-hook ((app (eql *veron-app*)))
-  (deliver-notification-to-error-line))
+  (deliver-notification-to-error-line)
+  ;; A Fotodruck form that was only a waiting notice is built again once there
+  ;; is a printer to use. Nothing is typed on such a page, so nothing is lost.
+  (when (fotodruck-wait-is-over-p)
+    (lispf:request-redisplay)))
 
 ;;; Message cleared hook — mark notifications as read when user dismisses
 

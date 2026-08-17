@@ -125,18 +125,29 @@
               rs2 (resolution-choice-line resolutions 2)
               rs3 (resolution-choice-line resolutions 3))))))
 
-(defun print-run-error-message (reason)
+(defun print-run-error (reason)
+  "What to say when a run cannot be fetched, and the field to answer it in.
+A photo the website will not give up is answered in the id; a photo it has but
+not at this density is answered in the density."
   (case reason
-    (:unknown "Diese Foto-ID ist unbekannt")
-    (:deleted "Dieses Foto wurde gelöscht")
-    (:converting "Das Foto wird noch aufbereitet - bitte in einigen Minuten erneut versuchen")
-    (:missing "Für dieses Foto gibt es keinen Ausdruck in dieser Auflösung")
-    (t "Die Fotoseite ist nicht erreichbar")))
+    (:unknown (values "Diese Foto-ID ist unbekannt" "photo-id"))
+    (:deleted (values "Dieses Foto wurde gelöscht" "photo-id"))
+    (:converting (values "Das Foto wird noch aufbereitet - bitte in einigen Minuten erneut versuchen"
+                         "photo-id"))
+    (:missing (values "Für dieses Foto gibt es keinen Ausdruck in dieser Auflösung"
+                      "res-sel"))
+    (t (values "Die Fotoseite ist nicht erreichbar" "photo-id"))))
+
+;;; Every complaint the form makes names the field it is about and leaves the
+;;; cursor there, so a correction is typed where the eye already is. The field
+;;; order must not be what decides this.
 
 (lispf:define-key-handler fotodruck :enter (printer-sel photo-id res-sel)
   (let* ((ready (ready-printers))
          (printer (selected-item ready printer-sel)))
     (unless printer
+      (when ready
+        (lispf:set-cursor-to-field "printer-sel"))
       (lispf:application-error
        (if ready "Bitte Drucker wählen" "Zurzeit ist kein Drucker verfügbar")))
     ;; The id is written back in the shape it is read in, so a correction is
@@ -151,7 +162,9 @@
         (lispf:application-error "Bitte Auflösung wählen"))
       (multiple-value-bind (data reason) (fetch-print-run printer resolution photo-id)
         (unless data
-          (lispf:application-error (print-run-error-message reason)))
+          (multiple-value-bind (message field) (print-run-error reason)
+            (lispf:set-cursor-to-field field)
+            (lispf:application-error message)))
         (let ((job (start-print-job printer resolution
                                     (user-username (session-user lispf:*session*))
                                     data)))

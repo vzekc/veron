@@ -432,6 +432,19 @@ close does not leave the printer looking connected for the life of the process."
       (assert (search "Der Ausdruck ist fertig" lines) ()
               "A finished run should say so, got ~S" lines))))
 
+(define-test print-run-error-names-a-field ()
+  "Every reason a run cannot be fetched has something to say and a field to
+say it in, so the field order is not what decides where a correction is typed."
+  (dolist (reason '(:unknown :deleted :converting :unreachable nil))
+    (multiple-value-bind (message field) (veron::print-run-error reason)
+      (assert (plusp (length message)) () "~S should have something to say" reason)
+      (assert (string= "photo-id" field) ()
+              "~S is about the id, but names ~S" reason field)))
+  (multiple-value-bind (message field) (veron::print-run-error :missing)
+    (assert (plusp (length message)) () ":missing should have something to say")
+    (assert (string= "res-sel" field) ()
+            ":missing is about the density, but names ~S" field)))
+
 ;;; Photo ids
 
 (define-test print-photo-id-validation ()
@@ -575,6 +588,8 @@ touching the keyboard."
                  (assert-on-screen s "FOTODRUCK")
                  (assert (wait-for-screen-contains s "unbekannt" :timeout 3)
                          () "Should say the photo id is unknown")
+                 (assert-cursor-at s 8 14
+                                   :description "Cursor should return to the id field")
                  (assert (veron::printer-ready-p printer) ()
                          "The printer should not have been claimed")))
           (ignore-errors (usocket:socket-close relay)))))))
@@ -604,7 +619,9 @@ touching the keyboard."
                  (type-text s "2")
                  (press-enter s)
                  (assert (wait-for-screen-contains s "aufbereitet" :timeout 3)
-                         () "Should say the photo is still being converted")))
+                         () "Should say the photo is still being converted")
+                 (assert-cursor-at s 8 14
+                                   :description "Cursor should return to the id field")))
           (ignore-errors (usocket:socket-close relay)))))))
 
 (define-test e2e-fotodruck-id-in-capitals ()
@@ -630,6 +647,31 @@ cursor to the density."
                                :description "The id should be taken up in capitals")
                (assert-cursor-at s 10 14
                                  :description "Cursor should be on the density field")))
+        (ignore-errors (usocket:socket-close relay))))))
+
+(define-test e2e-fotodruck-malformed-id ()
+  "An id that is not one is answered in the id field, not somewhere else."
+  (with-print-listener (port)
+    (let ((printer (veron::find-printer "nec-p6"))
+          (relay (connect-relay port "nec-p6 test-token")))
+      (unwind-protect
+           (progn
+             (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
+                     "Printer should be ready")
+             (with-veron-app (s :username "printuser10" :password "printpass10")
+               (login s "printuser10" "printpass10")
+               (select-menu-item s "Fotodruck")
+               (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
+                       () "Should ask for the photo id")
+               ;; O is not in the booth's alphabet, so this is not an id.
+               (move-cursor s 8 14)
+               (type-text s "K7NPO4")
+               (move-cursor s 10 14)
+               (type-text s "2")
+               (press-enter s)
+               (assert-message s "sechsstellige Foto-ID")
+               (assert-cursor-at s 8 14
+                                 :description "Cursor should be on the id field")))
         (ignore-errors (usocket:socket-close relay))))))
 
 (define-test e2e-fotodruck-busy ()

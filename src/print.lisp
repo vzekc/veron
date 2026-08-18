@@ -274,7 +274,9 @@ run disappearing into a buffer and looking finished.")
                  (plusp (length (print-token)))
                  (string= token (print-token)))
       (lispf:log-message :warn "fotodruck: Anmeldung von ~A abgewiesen"
-                         (ignore-errors (usocket:get-peer-address socket)))
+                         (ignore-errors
+                           (usocket:host-to-hostname
+                            (usocket:get-peer-address socket))))
       (return-from handle-relay-connection))
     ;; Set up the socket before it is registered, so that it is a fully
     ;; configured connection by the time anything can find it.

@@ -157,7 +157,7 @@ RESPONDER receives the request path and returns a status and the body as octets.
     (values port
             (lambda ()
               (ignore-errors (usocket:socket-close listener))
-              (ignore-errors (bt:destroy-thread thread))))))
+              (veron::wait-for-thread-end thread "test photo website")))))
 
 ;;; The relay connection
 

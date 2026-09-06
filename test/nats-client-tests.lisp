@@ -192,7 +192,7 @@
     (setf (mock-connections server) nil))
   (when (and (mock-accept-thread server)
              (bt:thread-alive-p (mock-accept-thread server)))
-    (ignore-errors (bt:destroy-thread (mock-accept-thread server)))))
+    (veron::wait-for-thread-end (mock-accept-thread server) "mock nats accept")))
 
 (defun mock-current-connection (server)
   (bt:with-lock-held ((mock-lock server))
@@ -368,7 +368,7 @@ it is answered, so the server holds no descriptors of its own."
     (values port
             (lambda ()
               (ignore-errors (usocket:socket-close listener))
-              (ignore-errors (bt:destroy-thread thread))))))
+              (veron::wait-for-thread-end thread "mock nats server")))))
 
 (define-test nats-failed-tls-handshake-closes-the-socket ()
   "A server that cannot be negotiated with costs an attempt, not a descriptor."
@@ -420,7 +420,7 @@ and after it, and a shutdown function."
             (lambda () (values (first before) (first after)))
             (lambda ()
               (ignore-errors (usocket:socket-close listener))
-              (ignore-errors (bt:destroy-thread thread))))))
+              (veron::wait-for-thread-end thread "mock nats server")))))
 
 (define-test nats-tls-starts-after-the-greeting ()
   "NATS greets in the clear and the connection is raised to TLS after it, so

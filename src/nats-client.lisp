@@ -334,11 +334,13 @@ and re-subscribe. Signals on failure."
 
 (defun teardown-connection (client)
   (set-state client :disconnected)
+  ;; The socket goes first: the reader is blocked on it, and a closed socket is
+  ;; what tells it to stop.
+  (close-socket-quietly (client-socket client))
   (let ((reader (client-reader-thread client)))
     (when (and reader (bt:thread-alive-p reader)
                (not (eq reader (bt:current-thread))))
-      (ignore-errors (bt:destroy-thread reader))))
-  (close-socket-quietly (client-socket client))
+      (wait-for-thread-end reader "nats: reader")))
   (setf (client-socket client) nil
         (client-stream client) nil
         (client-reader-thread client) nil))

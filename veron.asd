@@ -6,6 +6,7 @@
   :pathname ""
   :components ((:module "src"
                 :components ((:file "package")
+                             (:file "threads")
                              (:file "nats-client")
                              (:file "status-bus")
                              (:file "dotenv")

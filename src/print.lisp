@@ -342,7 +342,8 @@ connects the moment this returns finds the port open."
     (ignore-errors (usocket:socket-close *print-listener-socket*))
     (setf *print-listener-socket* nil))
   (when *print-listener-thread*
-    (ignore-errors (bt:destroy-thread *print-listener-thread*))
+    ;; The closed socket ends the accept loop, and the thread with it.
+    (wait-for-thread-end *print-listener-thread* "fotodruck: Druckeranschluss")
     (setf *print-listener-thread* nil)))
 
 ;;; Sending a run

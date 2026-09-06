@@ -48,9 +48,17 @@ Full set documented in the docstring on `veron:start-from-env` in `src/veron.lis
 ## Fotodruck
 
 The Fotodruck screen prints a visitor's photo from the fotofix booth on a
-dot-matrix printer at the show. The user types the photo id from their receipt
-and picks a density; veron fetches that photo's print run from the exhibition
-website and sends it to the printer.
+dot-matrix printer at the show. It asks in three screens: the form takes the
+photo id from the receipt, the preview shows the photograph and asks for the
+density on the line under it, and the report follows the sheet coming out.
+
+The preview is ASCII art the exhibition website keeps beside the print runs,
+`ascii-veron.txt`, drawn 53 columns by 16 rows so it stands between the title
+row and the density line with the message line and the key labels below. It is
+fetched when the id is entered, so an id the website does not know is answered
+on the form rather than after a density has been chosen. Its characters are the
+ones every EBCDIC code page agrees on, so the picture is the same picture on a
+terminal set up for any of them.
 
 The printer hangs off a print server on the show's internal network, which has
 no inbound route, so a relay beside it dials in to `VERON_PRINT_PORT` and holds

@@ -1,0 +1,10 @@
+(:name "fotodruck-vorschau"
+ :title "Fotodruck"
+ :screen "
+"
+ :dynamic-areas ((:name preview :from (0 0) :to (15 79)))
+ :fields ((:from (17 3) :len 9 :name lbl-res)
+          (:from (17 13) :len 1 :name res-sel :write t :intense t :highlighting underscore)
+          (:from (17 15) :len 64 :name choices :color green))
+ :keys ((:enter "Drucken" :hidden t)
+        (:pf3 "Zurück" :back t)))

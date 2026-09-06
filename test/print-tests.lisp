@@ -447,6 +447,23 @@ say it in, so the field order is not what decides where a correction is typed."
 
 ;;; Photo ids
 
+(define-test print-preview-fits-the-screen ()
+  "A preview arrives with line endings and blank rows at its foot, and what is
+kept is the picture, held to the rows the screen has for it."
+  (let ((lines (veron::preview-lines
+                (format nil "AAA~C~%BBB~C~%~C~%~C~%" #\Return #\Return
+                        #\Return #\Return))))
+    (assert (equal '("AAA" "BBB") lines) () "Kept ~S" lines))
+  (let ((many (veron::preview-lines
+               (with-output-to-string (out)
+                 (dotimes (row 30) (format out "Zeile ~D~%" row))))))
+    (assert (= veron::*preview-rows* (length many)) ()
+            "~D rows kept, the screen has ~D" (length many) veron::*preview-rows*))
+  (let ((margin (floor (- 80 veron::*preview-columns*) 2)))
+    (assert (string= (concatenate 'string (make-string margin :initial-element #\Space) "x")
+                     (first (veron::preview-display-lines '("x"))))
+            () "The picture should be set in from the left")))
+
 (define-test print-failure-reason-is-what-went-wrong ()
   "A socket error opens with the stream it happened on, so the reason the run
 reports is the line below it."
@@ -526,6 +543,25 @@ touching the keyboard."
     (dotimes (i length data)
       (setf (aref data i) (mod (* i 7) 256)))))
 
+(defun test-preview-text ()
+  "Sixteen rows of a preview as the website keeps them, a letter to a row."
+  (with-output-to-string (out)
+    (dotimes (row veron::*preview-rows*)
+      (format out "~A~C~C"
+              (make-string veron::*preview-columns*
+                           :initial-element (code-char (+ (char-code #\A) row)))
+              #\Return #\Newline))))
+
+(defun preview-website (photo-id &optional runs)
+  "A website that has the preview for PHOTO-ID, and the runs RUNS names as
+(path . octets)."
+  (lambda (path)
+    (cond ((string= path (format nil "/foto/~A/ascii-veron.txt" photo-id))
+           (values 200 (babel:string-to-octets (test-preview-text))))
+          ((assoc path runs :test #'string=)
+           (values 200 (cdr (assoc path runs :test #'string=))))
+          (t (values 404 (babel:string-to-octets "no"))))))
+
 (defmacro with-photo-website ((responder) &body body)
   "Point VERON_FOTOFIX_URL at a website that answers with RESPONDER."
   (let ((stop (gensym "STOP")) (port (gensym "PORT")))
@@ -541,10 +577,9 @@ touching the keyboard."
     (let* ((run (test-print-run 20000))
            (printer (veron::find-printer "nec-p6"))
            (relay (connect-relay port "nec-p6 test-token")))
-      (with-photo-website ((lambda (path)
-                             (if (string= path "/foto/K7NP4M/nec-p6-180.prn")
-                                 (values 200 run)
-                                 (values 404 (babel:string-to-octets "no")))))
+      (with-photo-website ((preview-website
+                            "K7NP4M"
+                            (list (cons "/foto/K7NP4M/nec-p6-180.prn" run))))
         (unwind-protect
              (progn
                (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
@@ -556,7 +591,11 @@ touching the keyboard."
                          () "Should ask for the photo id")
                  (move-cursor s 8 14)
                  (type-text s "K7NP4M")
-                 (move-cursor s 10 14)
+                 (press-enter s)
+                 (assert-on-screen s "FOTODRUCK-VORSCHAU")
+                 (assert (wait-for-screen-contains s "Auflösung" :timeout 3)
+                         () "The preview should ask for the density")
+                 (move-cursor s 18 13)
                  (type-text s "2")
                  (press-enter s)
                  (assert-on-screen s "FOTODRUCK-STATUS")
@@ -597,8 +636,6 @@ touching the keyboard."
                          () "Should ask for the photo id")
                  (move-cursor s 8 14)
                  (type-text s "K7NP4M")
-                 (move-cursor s 10 14)
-                 (type-text s "2")
                  (press-enter s)
                  (assert-on-screen s "FOTODRUCK")
                  (assert (wait-for-screen-contains s "unbekannt" :timeout 3)
@@ -630,8 +667,6 @@ touching the keyboard."
                          () "Should ask for the photo id")
                  (move-cursor s 8 14)
                  (type-text s "K7NP4M")
-                 (move-cursor s 10 14)
-                 (type-text s "2")
                  (press-enter s)
                  (assert (wait-for-screen-contains s "aufbereitet" :timeout 3)
                          () "Should say the photo is still being converted")
@@ -640,29 +675,33 @@ touching the keyboard."
           (ignore-errors (usocket:socket-close relay)))))))
 
 (define-test e2e-fotodruck-id-in-capitals ()
-  "Enter with an id and no density takes the id up in capitals and moves the
-cursor to the density."
+  "An id typed in lower case is taken up in capitals, which is the shape the
+website is asked for it in, and the preview follows on it."
   (with-print-listener (port)
     (let ((printer (veron::find-printer "nec-p6"))
-          (relay (connect-relay port "nec-p6 test-token")))
-      (unwind-protect
-           (progn
-             (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
-                     "Printer should be ready")
-             (with-veron-app (s :username "printuser7" :password "printpass7")
-               (login s "printuser7" "printpass7")
-               (select-menu-item s "Fotodruck")
-               (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
-                       () "Should ask for the photo id")
-               (move-cursor s 8 14)
-               (type-text s "k7np4m")
-               (press-enter s)
-               (assert-message s "Auflösung wählen")
-               (assert-text-at s 8 14 6 "K7NP4M"
-                               :description "The id should be taken up in capitals")
-               (assert-cursor-at s 10 14
-                                 :description "Cursor should be on the density field")))
-        (ignore-errors (usocket:socket-close relay))))))
+          (relay (connect-relay port "nec-p6 test-token"))
+          (asked nil))
+      (with-photo-website ((lambda (path)
+                             (push path asked)
+                             (funcall (preview-website "K7NP4M") path)))
+        (unwind-protect
+             (progn
+               (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
+                       "Printer should be ready")
+               (with-veron-app (s :username "printuser7" :password "printpass7")
+                 (login s "printuser7" "printpass7")
+                 (select-menu-item s "Fotodruck")
+                 (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
+                         () "Should ask for the photo id")
+                 (move-cursor s 8 14)
+                 (type-text s "k7np4m")
+                 (press-enter s)
+                 (assert-on-screen s "FOTODRUCK-VORSCHAU")
+                 (assert (member "/foto/K7NP4M/ascii-veron.txt" asked :test #'string=)
+                         () "The website should be asked in capitals, was asked ~S" asked)
+                 (assert-cursor-at s 18 13
+                                   :description "Cursor should be on the density field")))
+          (ignore-errors (usocket:socket-close relay)))))))
 
 (define-test e2e-fotodruck-malformed-id ()
   "An id that is not one is answered in the id field, not somewhere else."
@@ -681,8 +720,6 @@ cursor to the density."
                ;; O is not in the booth's alphabet, so this is not an id.
                (move-cursor s 8 14)
                (type-text s "K7NPO4")
-               (move-cursor s 10 14)
-               (type-text s "2")
                (press-enter s)
                (assert-message s "sechsstellige Foto-ID")
                (assert-cursor-at s 8 14
@@ -722,7 +759,7 @@ cursor to the density."
         (ignore-errors (usocket:socket-close relay))))))
 
 (define-test e2e-fotodruck-offers-the-form ()
-  "With a relay connected the form asks for an id and offers the densities."
+  "With a relay connected the form asks for an id and names the printer."
   (with-print-listener (port)
     (let ((printer (veron::find-printer "nec-p6"))
           (socket (connect-relay port "nec-p6 test-token")))
@@ -737,18 +774,51 @@ cursor to the density."
                (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
                        () "Should ask for the photo id")
                (let ((full (format nil "~{~A~^~%~}" (screen-text s))))
-                 (assert (search "Hoch" full) () "Should offer the high density")
-                 (assert (search "360 dpi" full) () "Should name the density")
                  (assert (search "NEC Pinwriter P6" full) ()
                          "Should name the connected printer")
-                 (assert (search "Auflösung" full) ()
-                         "Umlauts should survive the way to the terminal"))
-               (assert (search "Niedrig" (screen-text-at s 10 17 50)) ()
-                       "The coarsest density should be the first choice")
-               (assert (search "Mittel" (screen-text-at s 11 17 50)) ()
-                       "The middle density should be the second choice")
-               (assert (search "Hoch" (screen-text-at s 12 17 50)) ()
-                       "The finest density should be the last choice")
+                 (assert (search "Foto-ID" full) ()
+                         "Should label the id field"))
                (assert-cursor-at s 8 14
                                  :description "Cursor should be on the id field")))
         (ignore-errors (usocket:socket-close socket))))))
+
+(define-test e2e-fotodruck-preview-offers-the-densities ()
+  "The preview stands where the picture goes, with the densities on the one line
+under it, and going back reaches the form the id was typed into."
+  (with-print-listener (port)
+    (let ((printer (veron::find-printer "nec-p6"))
+          (relay (connect-relay port "nec-p6 test-token")))
+      (with-photo-website ((preview-website "K7NP4M"))
+        (unwind-protect
+             (progn
+               (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
+                       "Printer should be ready")
+               (with-veron-app (s :username "printuser11" :password "printpass11")
+                 (login s "printuser11" "printpass11")
+                 (select-menu-item s "Fotodruck")
+                 (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
+                         () "Should ask for the photo id")
+                 (move-cursor s 8 14)
+                 (type-text s "K7NP4M")
+                 (press-enter s)
+                 (assert-on-screen s "FOTODRUCK-VORSCHAU")
+                 ;; The picture keeps the rows above the density line, set in
+                 ;; from the left so it stands in the middle of the screen.
+                 (assert-text-at s 1 13 veron::*preview-columns*
+                                 (make-string veron::*preview-columns*
+                                              :initial-element #\A)
+                                 :description "The first row of the preview")
+                 (assert-text-at s 16 13 veron::*preview-columns*
+                                 (make-string veron::*preview-columns*
+                                              :initial-element #\P)
+                                 :description "The last row of the preview")
+                 (let ((line (screen-text-at s 18 0 79)))
+                   (dolist (label '("Auflösung" "Niedrig" "Mittel" "Hoch"))
+                     (assert (search label line) ()
+                             "~A should be on the density line, which reads ~S"
+                             label line)))
+                 (press-pf s 3)
+                 (assert-on-screen s "FOTODRUCK")
+                 (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
+                         () "Going back should reach the form")))
+          (ignore-errors (usocket:socket-close relay)))))))

@@ -30,6 +30,18 @@
             (print-duration-text (print-resolution-seconds resolution)))
     ""))
 
+(defun resolution-choice-text (items)
+  "The densities on one line, as the preview asks for them: the picture has the
+screen, so what is left for the choice is the row under it."
+  (format nil "~{~A~^   ~}"
+          (loop for resolution in items
+                for index from 1
+                collect (format nil "~D ~A, ~A"
+                                index
+                                (print-resolution-label resolution)
+                                (print-duration-text
+                                 (print-resolution-seconds resolution))))))
+
 (defun selection-index (value)
   "The 1-based number typed into a selection field, or NIL."
   (let ((digits (string-trim " " value)))
@@ -92,38 +104,41 @@
   (fotodruck-info-lines))
 
 (lispf:define-screen-update fotodruck (lbl-printer printer-sel pr1 pr2 pr3
-                                       lbl-id photo-id
-                                       lbl-res res-sel rs1 rs2 rs3)
+                                       lbl-id photo-id)
   (setf lbl-printer "" pr1 "" pr2 "" pr3 ""
-        lbl-id "" lbl-res "" rs1 "" rs2 "" rs3 "")
+        lbl-id "")
   (let ((ready (ready-printers)))
     ;; What the update cycle compares against to notice the wait is over.
     (setf (lispf:session-property lispf:*session* :fotodruck-waiting) (null ready))
     (if ready
-        (lispf:show-key :enter "Drucken")
+        (lispf:show-key :enter "Weiter")
         ;; Nothing to fill in when there is nothing to print on, so the cursor
         ;; waits on the line that says why rather than under the key labels.
         (progn
-          (setf photo-id "" res-sel "" printer-sel "")
-          (dolist (field '("photo-id" "res-sel" "printer-sel"))
+          (setf photo-id "" printer-sel "")
+          (dolist (field '("photo-id" "printer-sel"))
             (lispf:set-field-attribute field :write nil))
           (lispf:set-cursor 4 3)))
     (unless (rest ready)
       (lispf:set-field-attribute "printer-sel" :write nil))
     (when ready
       (setf lbl-id "Foto-ID"
-            lbl-res "Auflösung"
             lbl-printer "Drucker")
       (if (rest ready)
           (setf pr1 (printer-choice-line ready 1)
                 pr2 (printer-choice-line ready 2)
                 pr3 (printer-choice-line ready 3))
-          (setf pr1 (printer-name (first ready))))
-      (let ((resolutions (printer-resolutions
-                          (or (selected-item ready printer-sel) (first ready)))))
-        (setf rs1 (resolution-choice-line resolutions 1)
-              rs2 (resolution-choice-line resolutions 2)
-              rs3 (resolution-choice-line resolutions 3))))))
+          (setf pr1 (printer-name (first ready)))))))
+
+(defun preview-error (reason)
+  "What to say when the preview cannot be fetched. Every reason is about the
+id, which is all the form has asked for by then."
+  (case reason
+    (:unknown "Diese Foto-ID ist unbekannt")
+    (:deleted "Dieses Foto wurde gelöscht")
+    (:converting "Das Foto wird noch aufbereitet - bitte in einigen Minuten erneut versuchen")
+    (:missing "Für dieses Foto gibt es keine Vorschau")
+    (t "Die Fotoseite ist nicht erreichbar")))
 
 (defun print-run-error (reason)
   "What to say when a run cannot be fetched, and the field to answer it in.
@@ -142,7 +157,7 @@ not at this density is answered in the density."
 ;;; cursor there, so a correction is typed where the eye already is. The field
 ;;; order must not be what decides this.
 
-(lispf:define-key-handler fotodruck :enter (printer-sel photo-id res-sel)
+(lispf:define-key-handler fotodruck :enter (printer-sel photo-id)
   (let* ((ready (ready-printers))
          (printer (selected-item ready printer-sel)))
     (unless printer
@@ -151,28 +166,74 @@ not at this density is answered in the density."
       (lispf:application-error
        (if ready "Bitte Drucker wählen" "Zurzeit ist kein Drucker verfügbar")))
     ;; The id is written back in the shape it is read in, so a correction is
-    ;; made to what the printer will be asked for.
+    ;; made to what the website will be asked for.
     (setf photo-id (string-upcase (string-trim " " photo-id)))
-    (let ((resolution (selected-item (printer-resolutions printer) res-sel)))
-      (unless (valid-photo-id-p photo-id)
+    (unless (valid-photo-id-p photo-id)
+      (lispf:set-cursor-to-field "photo-id")
+      (lispf:application-error "Bitte die sechsstellige Foto-ID vom Beleg eingeben"))
+    (multiple-value-bind (lines reason) (fetch-preview photo-id)
+      (unless lines
         (lispf:set-cursor-to-field "photo-id")
-        (lispf:application-error "Bitte die sechsstellige Foto-ID vom Beleg eingeben"))
+        (lispf:application-error (preview-error reason)))
+      (setf (lispf:session-property lispf:*session* :print-photo-id) photo-id
+            (lispf:session-property lispf:*session* :print-printer) (printer-stem printer)
+            (lispf:session-property lispf:*session* :print-preview) lines)
+      'fotodruck-vorschau)))
+
+;;; The preview
+;;;
+;;; The photograph as the printer will lay it down, over the one line that asks
+;;; how finely to print it: the visitor sees what they are paying a sheet for
+;;; before they choose how long it takes.
+
+(defun preview-display-lines (lines)
+  "LINES set in from the left, so the picture stands in the middle of the screen."
+  (let ((margin (make-string (floor (- 80 *preview-columns*) 2)
+                             :initial-element #\Space)))
+    (mapcar (lambda (line) (concatenate 'string margin line)) lines)))
+
+(defun session-printer ()
+  "The printer the form was answered for, while it is still there to print on."
+  (when-let (stem (lispf:session-property lispf:*session* :print-printer))
+    (find-printer stem)))
+
+(lispf:define-dynamic-area-updater fotodruck-vorschau preview ()
+  (preview-display-lines
+   (lispf:session-property lispf:*session* :print-preview)))
+
+(lispf:define-screen-update fotodruck-vorschau (lbl-res choices)
+  (setf lbl-res "Auflösung"
+        choices (if-let (printer (session-printer))
+                  (resolution-choice-text (printer-resolutions printer))
+                  ""))
+  ;; The cursor waits under the density. The update answers with nothing: a
+  ;; symbol here is read as a screen to go to instead of showing this one.
+  (lispf:set-cursor-to-field "res-sel")
+  nil)
+
+(lispf:define-key-handler fotodruck-vorschau :enter (res-sel)
+  (let ((printer (session-printer))
+        (photo-id (lispf:session-property lispf:*session* :print-photo-id)))
+    (unless printer
+      (lispf:application-error "Zurzeit ist kein Drucker verfügbar"))
+    (let ((resolution (selected-item (printer-resolutions printer) res-sel)))
       (unless resolution
         (lispf:set-cursor-to-field "res-sel")
         (lispf:application-error "Bitte Auflösung wählen"))
       (multiple-value-bind (data reason) (fetch-print-run printer resolution photo-id)
         (unless data
-          (multiple-value-bind (message field) (print-run-error reason)
-            (lispf:set-cursor-to-field field)
-            (lispf:application-error message)))
+          (lispf:set-cursor-to-field "res-sel")
+          (lispf:application-error (print-run-error reason)))
         (let ((job (start-print-job printer resolution
                                     (user-username (session-user lispf:*session*))
                                     data)))
           (unless job
             (lispf:application-error "Der Drucker ist inzwischen belegt"))
           (setf (lispf:session-property lispf:*session* :print-job) job)
-          ;; The form has done its job once the sheet is on its way, so the
-          ;; status takes its place and leaving the status reaches the menu.
+          ;; The preview has done its job once the sheet is on its way, so the
+          ;; status takes its place and the form it was reached from goes with
+          ;; it: leaving the status lands where the form was called from.
+          (pop (lispf:session-screen-stack lispf:*session*))
           (cons :replace 'fotodruck-status))))))
 
 ;;; The sheet coming out

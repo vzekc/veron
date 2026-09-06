@@ -469,6 +469,48 @@ read as a one or a zero.")
                 (t :ready)))
         :unknown)))
 
+(defparameter *preview-file* "ascii-veron.txt"
+  "What the website calls the preview a visitor is shown before they print.")
+
+(defparameter *preview-columns* 53
+  "How wide the preview is drawn, which is what the screen centres it on.")
+
+(defparameter *preview-rows* 16
+  "How many rows of the screen the preview stands in.")
+
+(defun no-file-reason (photo-id)
+  "Why the website has no such file for PHOTO-ID: :unknown, :deleted or
+:converting when the photo itself is the reason, and :missing when the photo is
+there and this file is not."
+  (case (photo-state photo-id)
+    (:unknown :unknown)
+    (:deleted :deleted)
+    (:converting :converting)
+    (t :missing)))
+
+(defun preview-lines (text)
+  "TEXT as the rows of a preview: line endings off, blank rows at the foot
+dropped, and no more rows than there is screen to stand them in."
+  (let ((lines (mapcar (lambda (line) (string-right-trim '(#\Return #\Space) line))
+                       (uiop:split-string text :separator (list #\Newline)))))
+    (loop while (and lines (string= "" (first (last lines))))
+          do (setf lines (butlast lines)))
+    (subseq lines 0 (min (length lines) *preview-rows*))))
+
+(defun fetch-preview (photo-id)
+  "Fetch the preview for PHOTO-ID.
+Returns its rows, or NIL and a keyword saying why there are none:
+:unknown, :deleted, :converting, :missing or :unreachable."
+  (multiple-value-bind (body status)
+      (http-get-octets (format nil "~A/foto/~A/~A"
+                               (fotofix-base-url) photo-id *preview-file*))
+    (cond ((and body (eql status 200))
+           (preview-lines (babel:octets-to-string body :encoding :latin-1)))
+          ((null status)
+           (values nil :unreachable))
+          (t
+           (values nil (no-file-reason photo-id))))))
+
 (defun fetch-print-run (printer resolution photo-id)
   "Fetch the print run for PHOTO-ID at RESOLUTION.
 Returns the octets, or NIL and a keyword saying why there are none:
@@ -483,8 +525,4 @@ Returns the octets, or NIL and a keyword saying why there are none:
           ((null status)
            (values nil :unreachable))
           (t
-           (values nil (case (photo-state photo-id)
-                         (:unknown :unknown)
-                         (:deleted :deleted)
-                         (:converting :converting)
-                         (t :missing)))))))
+           (values nil (no-file-reason photo-id))))))

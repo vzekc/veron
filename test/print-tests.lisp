@@ -447,6 +447,21 @@ say it in, so the field order is not what decides where a correction is typed."
 
 ;;; Photo ids
 
+(define-test print-failure-reason-is-what-went-wrong ()
+  "A socket error opens with the stream it happened on, so the reason the run
+reports is the line below it."
+  (assert (string= "Connection reset by peer"
+                   (veron::failure-reason
+                    (make-condition
+                     'simple-error
+                     :format-control
+                     "Couldn't write to #<FD-STREAM for \"socket 1.2.3.4:3272\">:~%  Connection reset by peer")))
+          () "The reason should read on its own")
+  (assert (string= "kaputt"
+                   (veron::failure-reason
+                    (make-condition 'simple-error :format-control "kaputt")))
+          () "A single-line condition is its own reason"))
+
 (define-test print-photo-id-validation ()
   "Six characters from the booth's alphabet, and nothing else."
   (assert (veron::valid-photo-id-p "K7NP4M") () "A well-formed id should be accepted")

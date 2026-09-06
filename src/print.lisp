@@ -342,7 +342,26 @@ printer is working on rather than what a buffer swallowed.")
 (defparameter *print-tick-seconds* 0.5
   "How often a run that is ahead of the sheet looks at the clock again.")
 
-(defun finish-print-job (job state message)
+(defun relay-address (socket)
+  "SOCKET's far end as text, so a report names the relay a run went to."
+  (or (ignore-errors
+        (format nil "~A:~D"
+                (usocket:host-to-hostname (usocket:get-peer-address socket))
+                (usocket:get-peer-port socket)))
+      "unbekannt"))
+
+(defun failure-reason (condition)
+  "The last line of CONDITION's text, which is what went wrong.
+A socket error opens with the stream it happened on, and that stream is veron's
+own end of the relay connection: the reason itself is on the line below it."
+  (let* ((text (princ-to-string condition))
+         (newline (position #\Newline text :from-end t)))
+    (string-trim '(#\Space #\Tab)
+                 (if newline (subseq text (1+ newline)) text))))
+
+(defun finish-print-job (job state message &optional detail)
+  "Record how JOB ended. MESSAGE is what the visitor reads on the report, DETAIL
+what the log adds about where the run stopped."
   (setf (print-job-state job) state
         (print-job-message job) message
         (print-job-finished-at job) (get-universal-time))
@@ -351,7 +370,7 @@ printer is working on rather than what a buffer swallowed.")
                      (print-job-username job)
                      (print-resolution-dpi (print-job-resolution job))
                      (if (eq state :done) "fertig" "abgebrochen")
-                     message
+                     detail
                      (format-duration (- (get-universal-time) (print-job-started-at job)))))
 
 (defun paced-limit (job total elapsed)
@@ -393,7 +412,12 @@ the run waits out that much before it counts as finished."
           (sleep *print-drain-seconds*)
           (finish-print-job job :done nil))
       (error (e)
-        (finish-print-job job :failed (princ-to-string e))))
+        (finish-print-job job :failed
+                          "Die Verbindung zum Drucker ist abgerissen."
+                          (format nil "~A über Relais ~A: ~A"
+                                  (printer-name (print-job-printer job))
+                                  (relay-address socket)
+                                  (failure-reason e)))))
     (setf (print-job-data job) nil)))
 
 (defun start-print-job (printer resolution username data)

@@ -119,6 +119,8 @@ screen, so what is left for the choice is the row under it."
           (dolist (field '("photo-id" "printer-sel"))
             (lispf:set-field-attribute field :write nil))
           (lispf:set-cursor 4 3)))
+    ;; One printer is not a choice: the field that would take the number says
+    ;; which printer it is, in the column the id is typed in.
     (unless (rest ready)
       (lispf:set-field-attribute "printer-sel" :write nil))
     (when ready
@@ -128,7 +130,7 @@ screen, so what is left for the choice is the row under it."
           (setf pr1 (printer-choice-line ready 1)
                 pr2 (printer-choice-line ready 2)
                 pr3 (printer-choice-line ready 3))
-          (setf pr1 (printer-name (first ready)))))))
+          (setf printer-sel (printer-name (first ready)))))))
 
 (defun preview-error (reason)
   "What to say when the preview cannot be fetched. Every reason is about the

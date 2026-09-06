@@ -29,6 +29,10 @@
    (lock :initform (bt:make-lock "printer") :reader printer-lock)
    (relay :initform nil :accessor printer-relay
           :documentation "The socket the relay is connected on, or NIL.")
+   (relay-address :initform nil :accessor printer-relay-address
+                  :documentation "Where the relay dialled from, taken when it
+signs on. A socket that has been reset no longer has a far end to ask, and a run
+that ends that way is exactly the one whose report has to name the relay.")
    (job :initform nil :accessor printer-job
         :documentation "The most recent job, running or finished."))
   (:documentation "A printer at the show and the relay that feeds it."))
@@ -264,6 +268,13 @@ run disappearing into a buffer and looking finished.")
    (setf (sb-bsd-sockets:sockopt-send-buffer (usocket:socket socket))
          *print-send-buffer-bytes*)))
 
+(defun socket-address (socket)
+  "SOCKET's far end as text, or NIL when it has none to give."
+  (ignore-errors
+    (format nil "~A:~D"
+            (usocket:host-to-hostname (usocket:get-peer-address socket))
+            (usocket:get-peer-port socket))))
+
 (defun handle-relay-connection (socket)
   (let* ((line (read-relay-line socket 30 200))
          (space (and line (position #\Space line)))
@@ -286,6 +297,7 @@ run disappearing into a buffer and looking finished.")
       (lispf:log-message :warn "fotodruck: ~A druckt gerade, Verbindung abgewiesen"
                          (printer-name printer))
       (return-from handle-relay-connection))
+    (setf (printer-relay-address printer) (socket-address socket))
     (lispf:log-message :info "fotodruck: ~A verbunden" (printer-name printer))
     (unwind-protect
          (serve-relay printer socket)
@@ -342,14 +354,6 @@ printer is working on rather than what a buffer swallowed.")
 (defparameter *print-tick-seconds* 0.5
   "How often a run that is ahead of the sheet looks at the clock again.")
 
-(defun relay-address (socket)
-  "SOCKET's far end as text, so a report names the relay a run went to."
-  (or (ignore-errors
-        (format nil "~A:~D"
-                (usocket:host-to-hostname (usocket:get-peer-address socket))
-                (usocket:get-peer-port socket)))
-      "unbekannt"))
-
 (defun failure-reason (condition)
   "The last line of CONDITION's text, which is what went wrong.
 A socket error opens with the stream it happened on, and that stream is veron's
@@ -372,6 +376,14 @@ what the log adds about where the run stopped."
                      (if (eq state :done) "fertig" "abgebrochen")
                      detail
                      (format-duration (- (get-universal-time) (print-job-started-at job)))))
+
+(defun run-failure-detail (job condition)
+  "Where the run stopped and what stopped it, as the log says it."
+  (let ((printer (print-job-printer job)))
+    (format nil "~A über Relais ~A: ~A"
+            (printer-name printer)
+            (or (printer-relay-address printer) "unbekannt")
+            (failure-reason condition))))
 
 (defun paced-limit (job total elapsed)
   "How many of TOTAL bytes may have gone out after ELAPSED seconds."
@@ -414,10 +426,7 @@ the run waits out that much before it counts as finished."
       (error (e)
         (finish-print-job job :failed
                           "Die Verbindung zum Drucker ist abgerissen."
-                          (format nil "~A über Relais ~A: ~A"
-                                  (printer-name (print-job-printer job))
-                                  (relay-address socket)
-                                  (failure-reason e)))))
+                          (run-failure-detail job e))))
     (setf (print-job-data job) nil)))
 
 (defun start-print-job (printer resolution username data)

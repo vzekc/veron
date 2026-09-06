@@ -176,6 +176,21 @@ RESPONDER receives the request path and returns a status and the body as octets.
                      "The connected printer should be the only ready one"))
         (usocket:socket-close socket)))))
 
+(define-test print-relay-address-outlives-the-socket ()
+  "The relay's address is taken when it signs on, because a socket reset in the
+middle of a run has no far end left to ask."
+  (with-print-listener (port)
+    (let ((printer (veron::find-printer "nec-p6"))
+          (relay (connect-relay port "nec-p6 test-token")))
+      (unwind-protect
+           (assert (wait-until (lambda () (veron::printer-ready-p printer))) ()
+                   "Printer should be ready")
+        (ignore-errors (usocket:socket-close relay)))
+      (wait-until (lambda () (null (veron::printer-relay printer))))
+      (let ((address (veron::printer-relay-address printer)))
+        (assert (and address (search "127.0.0.1:" address)) ()
+                "The address should outlive the connection, got ~S" address)))))
+
 (define-test print-relay-connection-is-probed ()
   "The connection is kept under keepalive, so a relay that goes away without a
 close does not leave the printer looking connected for the life of the process."
@@ -464,6 +479,26 @@ kept is the picture, held to the rows the screen has for it."
                      (first (veron::preview-display-lines '("x"))))
             () "The picture should be set in from the left")))
 
+(define-test print-run-failure-names-the-relay ()
+  "A run that ends early is reported with the printer, the relay it was going to
+and the reason on its own."
+  (let* ((printer (make-instance 'veron::printer
+                                 :name "Testdrucker" :stem "test"
+                                 :resolutions (list (veron::resolution 180 "Mittel" 210))))
+         (job (make-instance 'veron::print-job
+                             :printer printer
+                             :resolution (first (veron::printer-resolutions printer))
+                             :username "testuser" :data nil :total 1000)))
+    (setf (veron::printer-relay-address printer) "10.0.0.5:4711")
+    (let ((detail (veron::run-failure-detail
+                   job (make-condition
+                        'simple-error
+                        :format-control
+                        "Couldn't write to #<FD-STREAM>:~%  Connection reset by peer"))))
+      (dolist (part '("Testdrucker" "10.0.0.5:4711" "Connection reset by peer"))
+        (assert (search part detail) ()
+                "~S should carry ~A" detail part)))))
+
 (define-test print-failure-reason-is-what-went-wrong ()
   "A socket error opens with the stream it happened on, so the reason the run
 reports is the line below it."
@@ -534,7 +569,7 @@ touching the keyboard."
                      "Printer should become ready")
              (assert (wait-for-screen-contains s "Foto-ID" :timeout 5)
                      () "The form should arrive on its own once there is a printer")
-             (assert-cursor-at s 8 14
+             (assert-cursor-at s 8 17
                                :description "Cursor should be on the id field"))
         (when relay (ignore-errors (usocket:socket-close relay)))))))
 
@@ -589,7 +624,7 @@ touching the keyboard."
                  (select-menu-item s "Fotodruck")
                  (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
                          () "Should ask for the photo id")
-                 (move-cursor s 8 14)
+                 (move-cursor s 8 17)
                  (type-text s "K7NP4M")
                  (press-enter s)
                  (assert-on-screen s "FOTODRUCK-VORSCHAU")
@@ -634,13 +669,13 @@ touching the keyboard."
                  (select-menu-item s "Fotodruck")
                  (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
                          () "Should ask for the photo id")
-                 (move-cursor s 8 14)
+                 (move-cursor s 8 17)
                  (type-text s "K7NP4M")
                  (press-enter s)
                  (assert-on-screen s "FOTODRUCK")
                  (assert (wait-for-screen-contains s "unbekannt" :timeout 3)
                          () "Should say the photo id is unknown")
-                 (assert-cursor-at s 8 14
+                 (assert-cursor-at s 8 17
                                    :description "Cursor should return to the id field")
                  (assert (veron::printer-ready-p printer) ()
                          "The printer should not have been claimed")))
@@ -665,12 +700,12 @@ touching the keyboard."
                  (select-menu-item s "Fotodruck")
                  (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
                          () "Should ask for the photo id")
-                 (move-cursor s 8 14)
+                 (move-cursor s 8 17)
                  (type-text s "K7NP4M")
                  (press-enter s)
                  (assert (wait-for-screen-contains s "aufbereitet" :timeout 3)
                          () "Should say the photo is still being converted")
-                 (assert-cursor-at s 8 14
+                 (assert-cursor-at s 8 17
                                    :description "Cursor should return to the id field")))
           (ignore-errors (usocket:socket-close relay)))))))
 
@@ -693,7 +728,7 @@ website is asked for it in, and the preview follows on it."
                  (select-menu-item s "Fotodruck")
                  (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
                          () "Should ask for the photo id")
-                 (move-cursor s 8 14)
+                 (move-cursor s 8 17)
                  (type-text s "k7np4m")
                  (press-enter s)
                  (assert-on-screen s "FOTODRUCK-VORSCHAU")
@@ -718,11 +753,11 @@ website is asked for it in, and the preview follows on it."
                (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
                        () "Should ask for the photo id")
                ;; O is not in the booth's alphabet, so this is not an id.
-               (move-cursor s 8 14)
+               (move-cursor s 8 17)
                (type-text s "K7NPO4")
                (press-enter s)
                (assert-message s "sechsstellige Foto-ID")
-               (assert-cursor-at s 8 14
+               (assert-cursor-at s 8 17
                                  :description "Cursor should be on the id field")))
         (ignore-errors (usocket:socket-close relay))))))
 
@@ -778,7 +813,7 @@ website is asked for it in, and the preview follows on it."
                          "Should name the connected printer")
                  (assert (search "Foto-ID" full) ()
                          "Should label the id field"))
-               (assert-cursor-at s 8 14
+               (assert-cursor-at s 8 17
                                  :description "Cursor should be on the id field")))
         (ignore-errors (usocket:socket-close socket))))))
 
@@ -798,7 +833,7 @@ under it, and going back reaches the form the id was typed into."
                  (select-menu-item s "Fotodruck")
                  (assert (wait-for-screen-contains s "Foto-ID" :timeout 3)
                          () "Should ask for the photo id")
-                 (move-cursor s 8 14)
+                 (move-cursor s 8 17)
                  (type-text s "K7NP4M")
                  (press-enter s)
                  (assert-on-screen s "FOTODRUCK-VORSCHAU")

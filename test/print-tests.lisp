@@ -147,11 +147,15 @@ RESPONDER receives the request path and returns a status and the body as octets.
          (thread (bt:make-thread
                   (lambda ()
                     (handler-case
+                        ;; Watched with a deadline, so closing the listener
+                        ;; ends this thread instead of leaving it in accept.
                         (loop
-                          (let ((socket (usocket:socket-accept listener)))
-                            (unwind-protect
-                                 (ignore-errors (serve-one-http-request socket responder))
-                              (ignore-errors (usocket:socket-close socket)))))
+                          (when (usocket:wait-for-input listener :timeout 0.2
+                                                                 :ready-only t)
+                            (let ((socket (usocket:socket-accept listener)))
+                              (unwind-protect
+                                   (ignore-errors (serve-one-http-request socket responder))
+                                (ignore-errors (usocket:socket-close socket))))))
                       (error () nil)))
                   :name "test-photo-website")))
     (values port

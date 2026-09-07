@@ -305,16 +305,21 @@ run disappearing into a buffer and looking finished.")
       (lispf:log-message :info "fotodruck: ~A getrennt" (printer-name printer)))))
 
 (defun accept-relay-connections (listener)
+  ;; The listener is watched with a deadline rather than waited on: a thread
+  ;; sitting in accept is not woken by another thread closing the socket under
+  ;; it, so a listener that has been closed is noticed here instead -- by the
+  ;; wait, or by the accept behind it -- and the loop ends with it.
   (loop
-    (let ((socket (usocket:socket-accept listener)))
-      (bt:make-thread
-       (lambda ()
-         (unwind-protect
-              (handler-case (handle-relay-connection socket)
-                (error (e)
-                  (lispf:log-message :warn "fotodruck: Relaisfehler: ~A" e)))
-           (ignore-errors (usocket:socket-close socket))))
-       :name "fotodruck-relay"))))
+    (when (usocket:wait-for-input listener :timeout 0.2 :ready-only t)
+      (let ((socket (usocket:socket-accept listener)))
+        (bt:make-thread
+         (lambda ()
+           (unwind-protect
+                (handler-case (handle-relay-connection socket)
+                  (error (e)
+                    (lispf:log-message :warn "fotodruck: Relaisfehler: ~A" e)))
+             (ignore-errors (usocket:socket-close socket))))
+         :name "fotodruck-relay")))))
 
 (defun start-print-listener (&key (host "0.0.0.0"))
   "Start listening for the print relay, if Fotodruck is configured.
